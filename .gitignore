@@ -5,6 +5,7 @@
 *.pts
 *.onnx
 *.trt
+*.pkl
 /checkpoints
 *.pth
 /images
@@ -15,3 +16,4 @@
 /test_imgs_s02
 /test_imgs1
 /ivslab
+/WFLW
