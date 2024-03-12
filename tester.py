@@ -1,4 +1,5 @@
 import os
+import time
 import torch
 from lib import utility
 
@@ -30,14 +31,18 @@ def test(args):
         config.logger.info("Loaded network")
         # config.logger.info('Net flops: {} G, params: {} MB'.format(flops/1e9, params/1e6))
 
-    # data - test
+    # data - test'
+    train_loader = utility.get_dataloader(config, "train")
     test_loader = utility.get_dataloader(config, "test")
 
     if config.logger is not None:
         config.logger.info("Loaded data from {:}".format(config.test_tsv_file))
 
     # inference
-    result, metrics = utility.forward(config, test_loader, net)
+    s_t = time.time()
+    result, metrics = utility.forward(config, test_loader, net, train_loader)
+    e_t = time.time()
+    print('Inference Time: ', e_t - s_t )
     if config.logger is not None:
         config.logger.info("Finished inference")
 

@@ -267,6 +267,7 @@ class StackedHGNetV1(nn.Module):
         self.inference = inference
 
     def forward(self, x):
+        # x.shape [32, 3, 256, 256]
         x = self.pre(x)
 
         y, fusionmaps = [], []
@@ -274,8 +275,9 @@ class StackedHGNetV1(nn.Module):
         for i in range(self.nstack):
             hg = self.hgs[i](x, heatmap=heatmaps)
             feature = self.features[i](hg)
-
+            #feature : 16 256 64 64
             heatmaps0 = self.out_heatmaps[i](feature)
+            # heatmaps0: 16 51 64 64
             heatmaps = self.heatmap_act(heatmaps0)
 
             if self.cfg.use_AAM:

@@ -1,0 +1,21 @@
+{
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "args": [
+                "--mode=train",
+                "--device_ids=0",
+                "--image_dir=images/",
+                "--annot_dir=./annotations/",
+                "--data_definition=ivslab",
+                //"--pretrained_weight=/disk2/icml/STAR/ivslab/efficientformerv2_s0_0.0420/model/best_model.pkl",
+                "--batch_size=16"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        }
+    ]
+}

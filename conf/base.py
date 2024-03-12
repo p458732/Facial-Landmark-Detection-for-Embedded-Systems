@@ -38,7 +38,7 @@ class Base:
         self.milestones = [50, 80]
         self.max_epoch = 100
 
-        self.net = "stackedHGnet_v1"
+        self.net = "stackedHGnet_v1"#"stackedHGnet_v1"
         self.nstack = 4
 
         # ["adam", "sgd"]

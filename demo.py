@@ -1,16 +1,20 @@
+import glob
 import os
 import cv2
 import copy
 import dlib
 import math
 import argparse
+from PIL import Image, ImageOps
 import numpy as np
 import gradio as gr
 from matplotlib import pyplot as plt
 import torch
+from facenet_pytorch import MTCNN, InceptionResnetV1
 # private package
 from lib import utility
 
+mtcnn = MTCNN(image_size=256, thresholds=[0.5,0.5,0.5],select_largest=True, keep_all=True, margin=0)
 
 class GetCropMatrix():
     """
@@ -179,9 +183,10 @@ class Alignment:
         return landmarks
 
 
-def draw_pts(img, pts, mode="pts", shift=4, color=(0, 255, 0), radius=1, thickness=1, save_path=None, dif=0,
+def draw_pts(img, pts, mode="index", shift=4, color=(0, 255, 0), radius=1, thickness=1, save_path=None, dif=0,
              scale=0.3, concat=False, ):
     img_draw = copy.deepcopy(img)
+    mode = "index"
     for cnt, p in enumerate(pts):
         if mode == "index":
             cv2.putText(img_draw, str(cnt), (int(float(p[0] + dif)), int(float(p[1] + dif))), cv2.FONT_HERSHEY_SIMPLEX,
@@ -201,17 +206,84 @@ def draw_pts(img, pts, mode="pts", shift=4, color=(0, 255, 0), radius=1, thickne
         cv2.imwrite(save_path, img_draw)
     return img_draw
 
-
-def process(input_image):
+def get_two_faces_list():
+    l = []
+    with open('/disk2/icml/STAR/annotations/ivslab/test_q.txt', 'r') as f:
+        l = f.readlines()
+    return l
+def process(input_image, path=None):
+    
     image_draw = copy.deepcopy(input_image)
     dets = detector(input_image, 1)
-
+    max_num_faces = 1
+    for l in two_faces_list:
+        if l[:-1] in path:
+            max_num_faces = 2
+    dets = dets[:max_num_faces]
     num_faces = len(dets)
-    if num_faces == 0:
-        print("Sorry, there were no faces found in '{}'".format(face_file_path))
-        exit()
+    results = []
+    imgg = Image.open(face_file_path)
+    _, boxes = mtcnn(imgg)
+    if boxes is None:
+        print("Switch to dlib: ", path)
+        for detection in dets:
+            face = sp(input_image, detection)
+            shape = []
+            for i in range(68):
+                x = face.part(i).x
+                y = face.part(i).y
+                shape.append((x, y))
+            shape = np.array(shape)
+            # image_draw = draw_pts(image_draw, shape)
+            x1, x2 = shape[:, 0].min(), shape[:, 0].max()
+            y1, y2 = shape[:, 1].min(), shape[:, 1].max()
+            scale = min(x2 - x1, y2 - y1) / 200 * 1.05
+            center_w = (x2 + x1) / 2
+            center_h = (y2 + y1) / 2
+
+            scale, center_w, center_h = float(scale), float(center_w), float(center_h)
+            landmarks_pv = alignment.analyze(input_image, scale, center_w, center_h)
+            results.append(landmarks_pv)
+            image_draw = draw_pts(image_draw, landmarks_pv)
+        return image_draw, results
+    boxes = boxes[:max_num_faces]
+    if boxes.shape[0] > 1:
+        n = boxes.shape[0]
+        while n > 1:
+            n-=1
+            for i in range(n):        
+                if boxes[i][2] + boxes[i][0] < boxes[i + 1][2] + boxes[i + 1][0] :  
+                    tmp = copy.copy(boxes[i])
+                    boxes[i] = boxes[i + 1]
+                    boxes[i + 1] = tmp
+    for box  in boxes:
+        landmarks = np.array([[box[0], box[1]], [box[2], box[3]]])
+        x1, x2 = landmarks[:, 0].min(), landmarks[:, 0].max()
+        y1, y2 = landmarks[:, 1].min(), landmarks[:, 1].max()
+        scale = min(x2 - x1, y2 - y1) / 200 * 1.05
+        center_w = (x2 + x1) / 2
+        center_h = (y2 + y1) / 2
+        
+        scale, center_w, center_h = float(scale), float(center_w), float(center_h)
+        landmarks_pv = alignment.analyze(input_image, scale, center_w, center_h)
+        results.append(landmarks_pv)
+        if save_imgs == False:
+            continue
+        image_draw = draw_pts(image_draw, landmarks_pv)
+    return image_draw, results
+        
 
     results = []
+    if len(dets) > 1:
+        dets_list = []
+        n = len(dets)
+        while n > 1:
+            n-=1
+            for i in range(n):        
+                if dets[i].center().x < dets[i+1].center().x :  
+                    tmp = copy.copy(dets[i])
+                    dets[i] = dets[i + 1]
+                    dets[i + 1] = tmp 
     for detection in dets:
         face = sp(input_image, detection)
         shape = []
@@ -235,9 +307,10 @@ def process(input_image):
 
 
 if __name__ == '__main__':
+    save_imgs =  False
     # face detector
     # could be downloaded in this repo: https://github.com/italojs/facial-landmarks-recognition/tree/master
-    predictor_path = '/path/to/shape_predictor_68_face_landmarks.dat'
+    predictor_path =  '/disk2/icml/STAR/shape_predictor_68_face_landmarks.dat'
     detector = dlib.get_frontal_face_detector()
     sp = dlib.shape_predictor(predictor_path)
 
@@ -245,22 +318,42 @@ if __name__ == '__main__':
     args = argparse.Namespace()
     args.config_name = 'alignment'
     # could be downloaded here: https://drive.google.com/file/d/1aOx0wYEZUfBndYy_8IYszLPG_D2fhxrT/view
-    model_path = '/path/to/WFLW_STARLoss_NME_4_02_FR_2_32_AUC_0_605.pkl'
+    #model_path = '/disk2/icml/STAR/ivslab/efficientformerv2_s0_0.0420/model/best_model.pkl'
+    model_path = '/disk2/icml/STAR/ivslab/swin_0.0322/model/best_model.pkl'
     device_ids = '0'
     device_ids = list(map(int, device_ids.split(",")))
     alignment = Alignment(args, model_path, dl_framework="pytorch", device_ids=device_ids)
-
+    
     # image:      input image
     # image_draw: draw the detected facial landmarks on image
     # results:    a list of detected facial landmarks
-    face_file_path = '/path/to/face/image/bald_guys.jpg'
-    image = cv2.imread(face_file_path)
-    image_draw, results = process(image)
-
-    # visualize
-    img = cv2.cvtColor(image_draw, cv2.COLOR_BGR2RGB)
-    plt.imshow(img)
-    plt.show()
+    img_paths = sorted(glob.glob("/disk2/icml/STAR/images/ivslab_facial_test_private_qualification/*.png"))
+    #img_paths = ["/disk2/icml/STAR/images/ivslab_facial_test_private_qualification/image_0001.png"]
+    # exce = ["image_0053", "image_0083", "image_0192", "image_0222", "image_0242", "image_0316?", "image_0321","image_0327", "image_0348","image_0354", "image_0394",\
+    #     "image_0405?", "image_0413","image_0435", "image_0457", "image_0481", "image_0484", "image_0518", "image_0527", \
+    #         "image_0558", "image_0605", "image_0633", "image_0640", "image_0646","image_0658", "image_0669","image_0716",\
+    #             "image_0757","image_0784", "image_0828", "image_0829","image_0886?","image_0913", "image_0932", "image_0943","image_0949","image_0959",\
+    #                 "image_1002", "image_1024","image_1028", "image_1052","image_1091","image_1126","image_1147", "image_1148?","image_1155?","image_1183","image_1193",\
+    #                     "image_1210"]
+    two_faces_list = get_two_faces_list()
+    for face_file_path in img_paths:
+        image = cv2.imread(face_file_path)
+        try:
+            image_draw, results = process(image, face_file_path)
+            with open (f'./test_data/{face_file_path.split("/")[-1].split(".")[0]}.txt','w') as f:
+                for result in results:
+                    f.write('version: 1\n' + 'n_points: 51\n' + '{\n')
+                    for landmark in result:
+                        f.write(f"{landmark[0]:.3f}" + ' ' + f"{landmark[1]:.3f}" + '\n')
+                    f.write('}\n')
+           
+        except:
+            continue
+        if save_imgs == False:
+            continue
+        # visualize
+        img = cv2.cvtColor(image_draw, cv2.COLOR_BGR2RGB)
+        plt.imsave(f'./test_imgs/{face_file_path.split("/")[-1]}', img)
 
     # demo
     # interface = gr.Interface(fn=process, inputs="image", outputs="image")

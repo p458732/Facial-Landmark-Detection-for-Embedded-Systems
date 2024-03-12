@@ -9,11 +9,11 @@ class Alignment(Base):
 
     def __init__(self, args):
         super(Alignment, self).__init__('alignment')
-        self.ckpt_dir = '/apdcephfs_cq3/share_1134483/charlinzhou/ckpts/STAR/'
-        self.net = "stackedHGnet_v1"
-        self.nstack = 4
+        self.ckpt_dir = './'
+        self.net = "swin_v2" #"efficientFormer_v2_s0" #"stackedHGnet_v1" # "mobile_vit_v2"
+        self.nstack = 1
         self.loader_type = "alignment"
-        self.data_definition = "WFLW"  # COFW, 300W, WFLW
+        self.data_definition = "ivslab"  # COFW, 300W, WFLW
         self.test_file = "test.tsv"
 
         # image
@@ -32,18 +32,19 @@ class Alignment(Base):
         self.decoder_type = 'default'
 
         # scheduler & optimizer
+        self.scheduler = "Cosine"
         self.milestones = [200, 350, 450]
         self.max_epoch = 500
-        self.optimizer = "adam"
-        self.learn_rate = 0.001
-        self.weight_decay = 0.00001
+        self.optimizer = "adamW"
+        self.learn_rate = 0.0002
+        self.weight_decay = 0.0001
         self.betas = [0.9, 0.999]
         self.gamma = 0.1
 
         # batch_size & workers
-        self.batch_size = 32
+        self.batch_size = 8
         self.train_num_workers = 16
-        self.val_batch_size = 32
+        self.val_batch_size = 8
         self.val_num_workers = 16
         self.test_batch_size = 16
         self.test_num_workers = 0
@@ -84,13 +85,15 @@ class Alignment(Base):
             self.classes_num = [29, 7, 29]
             self.crop_op = True
             self.flip_mapping = (
-                [0, 1], [4, 6], [2, 3], [5, 7], [8, 9], [10, 11], [12, 14], [16, 17], [13, 15], [18, 19], [22, 23],
+                [0, 1], [4, 6], [2, 3], [5, 7], [8, 9], [10, 11], [
+                    12, 14], [16, 17], [13, 15], [18, 19], [22, 23],
             )
             self.image_dir = osp.join(self.image_dir, 'COFW')
         # 300W
         elif self.data_definition == "300W":
             self.edge_info = (
-                (False, (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)),  # FaceContour
+                (False, (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+                 11, 12, 13, 14, 15, 16)),  # FaceContour
                 (False, (17, 18, 19, 20, 21)),  # RightEyebrow
                 (False, (22, 23, 24, 25, 26)),  # LeftEyebrow
                 (False, (27, 28, 29, 30)),  # NoseLine
@@ -111,17 +114,20 @@ class Alignment(Base):
             self.classes_num = [68, 9, 68]
             self.crop_op = True
             self.flip_mapping = (
-                [0, 16], [1, 15], [2, 14], [3, 13], [4, 12], [5, 11], [6, 10], [7, 9],
+                [0, 16], [1, 15], [2, 14], [3, 13], [
+                    4, 12], [5, 11], [6, 10], [7, 9],
                 [17, 26], [18, 25], [19, 24], [20, 23], [21, 22],
                 [31, 35], [32, 34],
                 [36, 45], [37, 44], [38, 43], [39, 42], [40, 47], [41, 46],
-                [48, 54], [49, 53], [50, 52], [61, 63], [60, 64], [67, 65], [58, 56], [59, 55],
+                [48, 54], [49, 53], [50, 52], [61, 63], [
+                    60, 64], [67, 65], [58, 56], [59, 55],
             )
             self.image_dir = osp.join(self.image_dir, '300W')
         # 300VW
         elif self.data_definition == "300VW":
             self.edge_info = (
-                (False, (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)),  # FaceContour
+                (False, (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+                 11, 12, 13, 14, 15, 16)),  # FaceContour
                 (False, (17, 18, 19, 20, 21)),  # RightEyebrow
                 (False, (22, 23, 24, 25, 26)),  # LeftEyebrow
                 (False, (27, 28, 29, 30)),  # NoseLine
@@ -142,13 +148,16 @@ class Alignment(Base):
             self.classes_num = [68, 9, 68]
             self.crop_op = True
             self.flip_mapping = (
-                [0, 16], [1, 15], [2, 14], [3, 13], [4, 12], [5, 11], [6, 10], [7, 9],
+                [0, 16], [1, 15], [2, 14], [3, 13], [
+                    4, 12], [5, 11], [6, 10], [7, 9],
                 [17, 26], [18, 25], [19, 24], [20, 23], [21, 22],
                 [31, 35], [32, 34],
                 [36, 45], [37, 44], [38, 43], [39, 42], [40, 47], [41, 46],
-                [48, 54], [49, 53], [50, 52], [61, 63], [60, 64], [67, 65], [58, 56], [59, 55],
+                [48, 54], [49, 53], [50, 52], [61, 63], [
+                    60, 64], [67, 65], [58, 56], [59, 55],
             )
-            self.image_dir = osp.join(self.image_dir, '300VW_Dataset_2015_12_14')
+            self.image_dir = osp.join(
+                self.image_dir, '300VW_Dataset_2015_12_14')
         # WFLW
         elif self.data_definition == "WFLW":
             self.edge_info = (
@@ -176,22 +185,57 @@ class Alignment(Base):
             self.classes_num = [98, 9, 98]
             self.crop_op = True
             self.flip_mapping = (
-                [0, 32], [1, 31], [2, 30], [3, 29], [4, 28], [5, 27], [6, 26], [7, 25], [8, 24], [9, 23], [10, 22],
+                [0, 32], [1, 31], [2, 30], [3, 29], [4, 28], [5, 27], [
+                    6, 26], [7, 25], [8, 24], [9, 23], [10, 22],
                 [11, 21], [12, 20], [13, 19], [14, 18], [15, 17],  # cheek
-                [33, 46], [34, 45], [35, 44], [36, 43], [37, 42], [38, 50], [39, 49], [40, 48], [41, 47],  # elbrow
-                [60, 72], [61, 71], [62, 70], [63, 69], [64, 68], [65, 75], [66, 74], [67, 73],
+                [33, 46], [34, 45], [35, 44], [36, 43], [37, 42], [
+                    38, 50], [39, 49], [40, 48], [41, 47],  # elbrow
+                [60, 72], [61, 71], [62, 70], [63, 69], [
+                    64, 68], [65, 75], [66, 74], [67, 73],
                 [55, 59], [56, 58],
                 [76, 82], [77, 81], [78, 80], [87, 83], [86, 84],
                 [88, 92], [89, 91], [95, 93], [96, 97]
             )
             self.image_dir = osp.join(self.image_dir, 'WFLW', 'WFLW_images')
 
+        # ivslab
+        elif self.data_definition == "ivslab":
+            self.edge_info = (
+                (True, (0, 1, 2, 3, 4)),  # RightEyebrow
+                (True, (5, 6, 7, 8, 9)),  # LeftEyebrow
+                (False, (10, 11, 12, 13)),  # NoseLine
+                (False, (14, 15, 16, 17, 18)),  # Nose
+                (True, (19, 20, 21, 22, 23, 24)),  # RightEye
+                (True, (25, 26, 27, 28, 29, 30)),  # LeftEye
+                (True, (31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42)),  # OuterLip
+                (True, (43, 44, 45, 46, 47, 48, 49, 50)),  # InnerLip
+            )
+            if self.norm_type in ['ocular']:
+                self.nme_left_index = 36  # ocular
+                self.nme_right_index = 45  # ocular
+            elif self.norm_type in['pupil', 'default']:
+                self.nme_left_index = [19, 20, 21, 22, 23, 24]  # pupil
+                self.nme_right_index = [25, 26, 27, 28, 29, 30]  # pupil
+            else:
+                raise NotImplementedError
+            
+            self.classes_num = [51, 8, 51]
+            self.crop_op = True
+            self.flip_mapping = (
+                [0, 9], [1, 8], [2, 7], [3, 6], [4, 5], 
+                [19, 28], [20, 27], [21, 26], [22, 25], [23, 30],
+                [24, 29], [14, 18], [15, 17], [31, 37], [32, 36], [33, 35],
+                [38, 42], [39, 41], [43, 47], [44, 46], [48, 50] 
+            )
+            self.image_dir = osp.join(
+                self.image_dir, 'ivslab_facial_train')
         self.label_num = self.nstack * 3 if self.use_AAM else self.nstack
         self.loss_weights, self.criterions, self.metrics = [], [], []
         for i in range(self.nstack):
             factor = (2 ** i) / (2 ** (self.nstack - 1))
             if self.use_AAM:
-                self.loss_weights += [factor * weight for weight in [1.0, 10.0, 10.0]]
+                self.loss_weights += [factor *
+                                      weight for weight in [1.0, 10.0, 10.0]]
                 self.criterions += [self.loss_func, "AWingLoss", "AWingLoss"]
                 self.metrics += ["NME", None, None]
             else:
@@ -199,21 +243,26 @@ class Alignment(Base):
                 self.criterions += [self.loss_func, ]
                 self.metrics += ["NME", ]
 
-        self.key_metric_index = (self.nstack - 1) * 3 if self.use_AAM else (self.nstack - 1)
+        self.key_metric_index = (self.nstack - 1) * \
+            3 if self.use_AAM else (self.nstack - 1)
 
         # data
         self.folder = self.get_foldername()
-        self.work_dir = osp.join(self.ckpt_dir, self.data_definition, self.folder)
+        self.work_dir = osp.join(
+            self.ckpt_dir, self.data_definition, self.folder)
         self.model_dir = osp.join(self.work_dir, 'model')
         self.log_dir = osp.join(self.work_dir, 'log')
 
-        self.train_tsv_file = osp.join(self.annot_dir, self.data_definition, "train.tsv")
+        self.train_tsv_file = osp.join(
+            self.annot_dir, self.data_definition, "train.tsv")
         self.train_pic_dir = self.image_dir
 
-        self.val_tsv_file = osp.join(self.annot_dir, self.data_definition, self.valset)
+        self.val_tsv_file = osp.join(
+            self.annot_dir, self.data_definition, self.valset)
         self.val_pic_dir = self.image_dir
 
-        self.test_tsv_file = osp.join(self.annot_dir, self.data_definition, self.test_file)
+        self.test_tsv_file = osp.join(
+            self.annot_dir, self.data_definition, self.test_file)
         self.test_pic_dir = self.image_dir
 
     def get_foldername(self):
@@ -221,8 +270,10 @@ class Alignment(Base):
         str += '{}_{}x{}_{}_ep{}_lr{}_bs{}'.format(self.data_definition, self.height, self.width,
                                                    self.optimizer, self.max_epoch, self.learn_rate, self.batch_size)
         str += '_{}'.format(self.loss_func)
-        str += '_{}_{}'.format(self.star_dist, self.star_w) if self.loss_func == 'STARLoss' else ''
+        str += '_{}_{}'.format(self.star_dist,
+                               self.star_w) if self.loss_func == 'STARLoss' else ''
         str += '_AAM' if self.use_AAM else ''
-        str += '_{}'.format(self.valset[:-4]) if self.valset != 'test.tsv' else ''
+        str += '_{}'.format(self.valset[:-4]
+                            ) if self.valset != 'test.tsv' else ''
         str += '_{}'.format(self.id)
         return str

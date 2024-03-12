@@ -68,11 +68,11 @@ class AlignmentDataset(Dataset):
             flip_rate=0.5,
             flip_mapping=flip_mapping,
             random_shift_sigma=0.05,
-            random_rot_sigma=math.pi / 180 * 18,
+            random_rot_sigma=math.pi / 180 * 45,
             random_scale_sigma=0.1,
             random_gray_rate=0.2,
             random_occ_rate=0.4,
-            random_blur_rate=0.3,
+            random_blur_rate=0.4,
             random_gamma_rate=0.2,
             random_nose_fusion_rate=0.2)
 
@@ -262,10 +262,17 @@ class AlignmentDataset(Dataset):
 
         image_path = self.items.iloc[index, 0]
         landmarks_5pts = self.items.iloc[index, 1]
-        landmarks_5pts = np.array(list(map(float, landmarks_5pts.split(","))), dtype=np.float32).reshape(5, 2)
+        try:
+            landmarks_5pts = np.array(list(map(float, landmarks_5pts.split(","))), dtype=np.float32).reshape(51, 2)
+        except:
+            landmarks_5pts = np.array(list(map(float, landmarks_5pts.split(","))), dtype=np.float32).reshape(68, 2)[:51, :]
         landmarks_target = self.items.iloc[index, 2]
-        landmarks_target = np.array(list(map(float, landmarks_target.split(","))), dtype=np.float32).reshape(
-            self.landmark_num, 2)
+        try:
+            landmarks_target = np.array(list(map(float, landmarks_target.split(","))), dtype=np.float32).reshape(
+                self.landmark_num, 2)
+        except:
+            landmarks_target = np.array(list(map(float, landmarks_target.split(","))), dtype=np.float32).reshape(
+                68, 2)[:self.landmark_num, :]
         scale = float(self.items.iloc[index, 3])
         center_w, center_h = float(self.items.iloc[index, 4]), float(self.items.iloc[index, 5])
         if len(self.items.iloc[index]) > 6:

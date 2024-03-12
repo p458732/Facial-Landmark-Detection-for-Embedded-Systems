@@ -84,7 +84,7 @@ class STARLoss_v2(nn.Module):
         wt_yv_minus_mean = wt_yv_minus_mean.view(batch_size * num_points, 1, height * width)  # [batch_size*68, 1, 4096]
         vec_concat = torch.cat((wt_xv_minus_mean, wt_yv_minus_mean), 1)  # [batch_size*68, 2, 4096]
 
-        htp_vec = htp.view(batch_size * num_points, 1, height * width)
+        htp_vec = htp.reshape(batch_size * num_points, 1, height * width)
         htp_vec = htp_vec.expand(-1, 2, -1)
 
         covariance = torch.bmm(htp_vec * vec_concat, vec_concat.transpose(1, 2))  # [batch_size*68, 2, 2]
@@ -111,7 +111,7 @@ class STARLoss_v2(nn.Module):
         normal_dist = normal_dist.reshape(bs, npoints, 1)
         tangent_dist = tangent_dist.reshape(bs, npoints, 1)
         dist = torch.cat((normal_dist, tangent_dist), dim=-1)
-        scale_dist = dist / torch.sqrt(evalues + self.EPSILON)
+        scale_dist = dist / torch.sqrt(evalues + 1e-04)
         scale_dist = scale_dist.sum(-1)
         return scale_dist
 
@@ -136,7 +136,7 @@ class STARLoss_v2(nn.Module):
         # TODO: GPU-based eigen-decomposition
         # https://github.com/pytorch/pytorch/issues/60537
         _covars = covars.view(bs * npoints, 2, 2).cpu()
-        evalues, evectors = _covars.symeig(eigenvectors=True)  # evalues [bs * 68, 2], evectors [bs * 68, 2, 2]
+        evalues, evectors = torch.linalg.eigh(_covars, UPLO='U')#_covars.symeig(eigenvectors=True)  # evalues [bs * 68, 2], evectors [bs * 68, 2, 2]
         evalues = evalues.view(bs, npoints, 2).to(heatmap)
         evectors = evectors.view(bs, npoints, 2, 2).to(heatmap)
 

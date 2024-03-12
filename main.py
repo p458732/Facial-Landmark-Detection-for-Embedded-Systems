@@ -1,14 +1,16 @@
 import argparse
 from trainer import train
+from student_trainer import student_train
 from tester import test
-
+import torch
+torch.manual_seed(0)
 
 def add_data_options(parser):
     group = parser.add_argument_group("dataset")
     group.add_argument("--image_dir", type=str, default=None, help="the directory of image")
     group.add_argument("--annot_dir", type=str, default=None, help="the directory of annot")
 
-
+5
 def add_base_options(parser):
     group = parser.add_argument_group("base")
     group.add_argument("--mode", type=str, default="train", help="train or test")
@@ -17,7 +19,7 @@ def add_base_options(parser):
                        help="set device ids, -1 means use cpu device, >= 0 means use gpu device")
     group.add_argument('--data_definition', type=str, default='WFLW', help="COFW, 300W, WFLW")
     group.add_argument('--learn_rate', type=float, default=0.001, help='learning rate')
-    group.add_argument("--batch_size", type=int, default=128, help="the batch size in train process")
+    group.add_argument("--batch_size", type=int, default=32, help="the batch size in train process")
     group.add_argument('--width', type=int, default=256, help='the width of input image')
     group.add_argument('--height', type=int, default=256, help='the height of input image')
 
@@ -60,6 +62,8 @@ if __name__ == "__main__":
     args.device_ids = list(map(int, args.device_ids.split(",")))
     if args.mode == "train":
         train(args)
+    elif args.mode == "train_student":
+        student_train(args)
     elif args.mode == "test":
         test(args)
     else:

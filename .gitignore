@@ -1,0 +1,17 @@
+*.jpg
+*.zip
+*.png
+*.pt
+*.pts
+*.onnx
+*.trt
+/checkpoints
+*.pth
+/images
+/annotations
+/test_data
+/test_imgs
+/test_imgs_s0
+/test_imgs_s02
+/test_imgs1
+/ivslab

@@ -21,6 +21,8 @@ class decoder_default:
             - coords: batch x npoints x 2 (x,y), [-1, +1]
             - radius_sq: batch x npoints
         """
+
+
         batch, npoints, h, w = heatmap.shape
         if self.use_weight_map:
             heatmap = heatmap * self.weight
