@@ -1,5 +1,6 @@
 import glob
 import os
+import time
 import cv2
 import copy
 import dlib
@@ -13,6 +14,7 @@ import torch
 from facenet_pytorch import MTCNN, InceptionResnetV1
 # private package
 from lib import utility
+
 
 mtcnn = MTCNN(image_size=256, thresholds=[0.5,0.5,0.5],select_largest=True, keep_all=True, margin=0)
 
@@ -99,6 +101,7 @@ class Alignment:
         self.input_size = 256
         self.target_face_scale = 1.0
         self.dl_framework = dl_framework
+        self.time = 0
 
         # model
         if self.dl_framework == "pytorch":
@@ -171,7 +174,9 @@ class Alignment:
 
         if self.dl_framework == "pytorch":
             with torch.no_grad():
+               
                 output = self.alignment(input_tensor)
+                
             landmarks = output[-1][0]
         else:
             assert False
@@ -271,39 +276,6 @@ def process(input_image, path=None):
             continue
         image_draw = draw_pts(image_draw, landmarks_pv)
     return image_draw, results
-        
-
-    results = []
-    if len(dets) > 1:
-        dets_list = []
-        n = len(dets)
-        while n > 1:
-            n-=1
-            for i in range(n):        
-                if dets[i].center().x < dets[i+1].center().x :  
-                    tmp = copy.copy(dets[i])
-                    dets[i] = dets[i + 1]
-                    dets[i + 1] = tmp 
-    for detection in dets:
-        face = sp(input_image, detection)
-        shape = []
-        for i in range(68):
-            x = face.part(i).x
-            y = face.part(i).y
-            shape.append((x, y))
-        shape = np.array(shape)
-        # image_draw = draw_pts(image_draw, shape)
-        x1, x2 = shape[:, 0].min(), shape[:, 0].max()
-        y1, y2 = shape[:, 1].min(), shape[:, 1].max()
-        scale = min(x2 - x1, y2 - y1) / 200 * 1.05
-        center_w = (x2 + x1) / 2
-        center_h = (y2 + y1) / 2
-
-        scale, center_w, center_h = float(scale), float(center_w), float(center_h)
-        landmarks_pv = alignment.analyze(input_image, scale, center_w, center_h)
-        results.append(landmarks_pv)
-        image_draw = draw_pts(image_draw, landmarks_pv)
-    return image_draw, results
 
 
 if __name__ == '__main__':
@@ -313,13 +285,14 @@ if __name__ == '__main__':
     predictor_path =  '/disk2/icml/STAR/shape_predictor_68_face_landmarks.dat'
     detector = dlib.get_frontal_face_detector()
     sp = dlib.shape_predictor(predictor_path)
-
+    avg_time = 0
+    count = 0
     # facial landmark detector
     args = argparse.Namespace()
     args.config_name = 'alignment'
     # could be downloaded here: https://drive.google.com/file/d/1aOx0wYEZUfBndYy_8IYszLPG_D2fhxrT/view
     #model_path = '/disk2/icml/STAR/ivslab/efficientformerv2_s0_0.0420/model/best_model.pkl'
-    model_path = '/disk2/icml/STAR/ivslab/swin_0.0322/model/best_model.pkl'
+    model_path = '/disk2/icml/STAR/ivslab/efficientformerv2_s0_0.0342/model/best_model.pkl'
     device_ids = '0'
     device_ids = list(map(int, device_ids.split(",")))
     alignment = Alignment(args, model_path, dl_framework="pytorch", device_ids=device_ids)
@@ -328,18 +301,12 @@ if __name__ == '__main__':
     # image_draw: draw the detected facial landmarks on image
     # results:    a list of detected facial landmarks
     img_paths = sorted(glob.glob("/disk2/icml/STAR/images/ivslab_facial_test_private_qualification/*.png"))
-    #img_paths = ["/disk2/icml/STAR/images/ivslab_facial_test_private_qualification/image_0001.png"]
-    # exce = ["image_0053", "image_0083", "image_0192", "image_0222", "image_0242", "image_0316?", "image_0321","image_0327", "image_0348","image_0354", "image_0394",\
-    #     "image_0405?", "image_0413","image_0435", "image_0457", "image_0481", "image_0484", "image_0518", "image_0527", \
-    #         "image_0558", "image_0605", "image_0633", "image_0640", "image_0646","image_0658", "image_0669","image_0716",\
-    #             "image_0757","image_0784", "image_0828", "image_0829","image_0886?","image_0913", "image_0932", "image_0943","image_0949","image_0959",\
-    #                 "image_1002", "image_1024","image_1028", "image_1052","image_1091","image_1126","image_1147", "image_1148?","image_1155?","image_1183","image_1193",\
-    #                     "image_1210"]
     two_faces_list = get_two_faces_list()
     for face_file_path in img_paths:
         image = cv2.imread(face_file_path)
         try:
             image_draw, results = process(image, face_file_path)
+            
             with open (f'./test_data/{face_file_path.split("/")[-1].split(".")[0]}.txt','w') as f:
                 for result in results:
                     f.write('version: 1\n' + 'n_points: 51\n' + '{\n')

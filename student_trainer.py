@@ -59,18 +59,15 @@ def train_worker(world_rank, world_size, nodes_size, args):
     net_module = teacher_net
     # load pretrain teacher model
     try:
-        pretrained_weight = "/disk2/icml/STAR/ivslab/stackedHGnet_v1_0.0310/model/best_model.pkl"
-        checkpoint = torch.load(pretrained_weight)
+        checkpoint = torch.load(config.teacher_weight_path)
         teacher_net.load_state_dict(checkpoint["net"], strict=False)
-        if net_ema is not None:
-            net_ema.load_state_dict(checkpoint["net_ema"], strict=False)
         if config.logger is not None:
-            config.logger.warn("Successed to load pretrain model %s." % pretrained_weight)
+            config.logger.warn("Successed to load pretrain model %s." % config.teacher_weight_path)
         start_epoch = 0
     except:
         start_epoch = 0
         if config.logger is not None:
-            config.logger.warn("Failed to load pretrain model %s." % pretrained_weight)
+            config.logger.warn("Failed to load pretrain model %s." % config.teacher_weight_path)
 
     if config.logger is not None:
         config.logger.info("Loaded network")
@@ -91,6 +88,7 @@ def train_worker(world_rank, world_size, nodes_size, args):
     # training
     best_metric, best_net = None, None
     epoch_time, eval_time = AverageMeter(), AverageMeter()
+    criterions = utility.get_criterions(config)
     optimizer = utility.get_optimizer(config, student_net)
     scheduler = utility.get_scheduler(config, optimizer)
     for i_epoch, epoch in enumerate(range(config.max_epoch + 1)):
@@ -99,7 +97,7 @@ def train_worker(world_rank, world_size, nodes_size, args):
             if epoch >= start_epoch:
                 # forward and backward
                 if epoch != start_epoch:
-                    utility.forward_backward_student(config, train_loader, teacher_net, student_net, optimizer, epoch)
+                    utility.forward_backward_student(config, train_loader, teacher_net, student_net, criterions, optimizer, epoch)
 
                 # validating
                 if epoch % config.val_epoch == 0 and epoch != 0 and world_rank == 0:

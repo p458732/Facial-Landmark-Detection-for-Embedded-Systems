@@ -10,7 +10,10 @@ class Alignment(Base):
     def __init__(self, args):
         super(Alignment, self).__init__('alignment')
         self.ckpt_dir = './'
-        self.net = "swin_v2" #"efficientFormer_v2_s0" #"stackedHGnet_v1" # "mobile_vit_v2"
+        self.net = "mobile_vit_v2" #"efficientFormer_v2_s0" #"stackedHGnet_v1" # "mobile_vit_v2"
+        self.student_net = "mobile_vit_v2"
+        self.teacher_net = "swin_v2"
+        self.teacher_weight_path =  '/disk2/icml/STAR/ivslab/swin_0.0322/model/best_model.pkl'
         self.nstack = 1
         self.loader_type = "alignment"
         self.data_definition = "ivslab"  # COFW, 300W, WFLW

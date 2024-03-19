@@ -442,14 +442,46 @@ def mobile_vit_v2():
     del state_dict['classifier.1.weight']
     del state_dict['classifier.1.bias']
     model.load_state_dict(state_dict, strict=False)
+    #stat(model, (3,256,256))
     return model
     
 
+#model = mobile_vit_v2()
 
-x = torch.rand((1,3,256,256))
-y, fusionmaps, landmarks = mobile_vit_v2()(x)
-print(fusionmaps[0].shape)
+#print("Params: ", params)
+#x = model(torch.rand(1,3,256,256))
 # stat(model, (3,256,256))
+# device = torch.device("cuda")
+# model.to(device)
+# dummy_input = torch.randn(16, 3,256,256, dtype=torch.float).to(device)
+
+# # INIT LOGGERS
+# starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+# repetitions = 300
+# timings=np.zeros((repetitions,1))
+# #GPU-WARM-UP
+# for _ in range(10):
+#     _ = model(dummy_input)
+# # MEASURE PERFORMANCE
+# with torch.no_grad():
+#     for rep in range(repetitions):
+#         starter.record()
+#         _ = model(dummy_input)
+#         ender.record()
+#         # WAIT FOR GPU SYNC
+#         torch.cuda.synchronize()
+#         curr_time = starter.elapsed_time(ender)
+#         timings[rep] = curr_time
+
+# mean_syn = np.sum(timings) / repetitions
+# std_syn = np.std(timings)
+# print(mean_syn)
+
+# x = torch.rand((1,3,256,256))
+
+# y, fusionmaps, landmarks = mobile_vit_v2()(x)
+# print(fusionmaps[0].shape)
+# stat(mobile_vit_v2(), (3,256,256))
 
 
 

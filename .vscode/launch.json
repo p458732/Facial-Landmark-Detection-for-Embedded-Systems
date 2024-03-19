@@ -6,7 +6,7 @@
             "request": "launch",
             "program": "${file}",
             "args": [
-                "--mode=train",
+                "--mode=train_student",
                 "--device_ids=0",
                 "--image_dir=images/",
                 "--annot_dir=./annotations/",

@@ -919,16 +919,16 @@ def getModelSize(model):
     return (param_size, param_sum, buffer_size, buffer_sum, all_size)
 
 
-# edge_info = (
-#                 (True, (0, 1, 2, 3, 4)),  # RightEyebrow
-#                 (True, (5, 6, 7, 8, 9)),  # LeftEyebrow
-#                 (False, (10, 11, 12, 13)),  # NoseLine
-#                 (False, (14, 15, 16, 17, 18)),  # Nose
-#                 (True, (19, 20, 21, 22, 23, 24)),  # RightEye
-#                 (True, (25, 26, 27, 28, 29, 30)),  # LeftEye
-#                 (True, (31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42)),  # OuterLip
-#                 (True, (43, 44, 45, 46, 47, 48, 49, 50)),  # InnerLip
-#             )
+edge_info = (
+                (True, (0, 1, 2, 3, 4)),  # RightEyebrow
+                (True, (5, 6, 7, 8, 9)),  # LeftEyebrow
+                (False, (10, 11, 12, 13)),  # NoseLine
+                (False, (14, 15, 16, 17, 18)),  # Nose
+                (True, (19, 20, 21, 22, 23, 24)),  # RightEye
+                (True, (25, 26, 27, 28, 29, 30)),  # LeftEye
+                (True, (31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42)),  # OuterLip
+                (True, (43, 44, 45, 46, 47, 48, 49, 50)),  # InnerLip
+            )
 
 # model = efficientformerv2_s0(pretrained=True, edge_info=edge_info)
 # total_params = sum(
@@ -941,6 +941,31 @@ def getModelSize(model):
 #stat(model, (3, 256, 256))
 
 
+# model = efficientformerv2_s0(pretrained=True, edge_info=edge_info)
+# stat(model, (3, 256, 256))
+# device = torch.device("cuda")
+# model.to(device)
+# dummy_input = torch.randn(1, 3,256,256, dtype=torch.float).to(device)
+# starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+# repetitions = 300
+# timings=np.zeros((repetitions,1))
+# #GPU-WARM-UP
+# for _ in range(10):
+#     _ = model(dummy_input)
+# # MEASURE PERFORMANCE
+# with torch.no_grad():
+#     for rep in range(repetitions):
+#         starter.record()
+#         _ = model(dummy_input)
+#         ender.record()
+#         # WAIT FOR GPU SYNC
+#         torch.cuda.synchronize()
+#         curr_time = starter.elapsed_time(ender)
+#         timings[rep] = curr_time
+
+# mean_syn = np.sum(timings) / repetitions
+# std_syn = np.std(timings)
+# print(mean_syn)
 
 
 
