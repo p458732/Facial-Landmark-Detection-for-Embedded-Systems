@@ -10,7 +10,6 @@
 /checkpoints
 *.pth
 /images
-/annotations
 /test_data
 /test_imgs
 /test_imgs_s0
