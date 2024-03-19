@@ -5,8 +5,8 @@ Abstract: TBD
 
 ## Dependencies
 
-* python==3.7.3
-* PyTorch=1.6.0
+* python==3.9.12
+* CUDA=12.2
 * requirements.txt
 
 ## Dataset Preparation
@@ -15,13 +15,13 @@ Abstract: TBD
  For ivslab challenge: [Metadata](https://drive.google.com/drive/folders/1w1p6OKh6r4xrkZ66trOuOpdLRzA4qwm9?usp=sharing) 
 ```script
 # the dataset directory:
-|-- ${image_dir}
-   |-- ivslab
+|-- images/
+   |-- ivslab/
       | -- ivslab_facial_train/
       | -- ivslab_facial_test_private_qualification/
    
-|-- ${annot_dir}
-   |-- ivslab
+|-- annotations/
+   |-- ivslab/
       | -- train.tsv 
       | -- test.tsv (actually validation set)
       | -- test_q.tsv
@@ -60,7 +60,7 @@ python main.py --mode=test --device_ids=0 \
                --data_definition=ivslab \
                --pretrained_weight=${model_path} \
 ```
-
+ 
 To test on your own image, the following code could be considered:
 ```shell
 python demo.py

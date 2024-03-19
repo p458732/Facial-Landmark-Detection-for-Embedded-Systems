@@ -17,8 +17,6 @@ from timm.models.registry import register_model
 from timm.models.layers.helpers import to_2tuple
 
 
-from torchstat import stat
-
 class E2HTransform(nn.Module):
     def __init__(self, edge_info, num_points, num_edges):
         super().__init__()

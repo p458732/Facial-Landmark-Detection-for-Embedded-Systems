@@ -6,7 +6,6 @@ import torch.nn as nn
 import numpy as np
 from tqdm import tqdm
 from timm.scheduler.cosine_lr import CosineLRScheduler
-from torchstat import stat
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader, DistributedSampler
 import torch.optim as optim
@@ -25,13 +24,6 @@ from lib.metric import NME, FR_AUC, MSE
 from lib.utils import convert_secs2time
 from lib.utils import AverageMeter
 
-import tensorrt
-import torch_tensorrt
-import pytorch_quantization
-from pytorch_quantization import nn as quant_nn
-from pytorch_quantization import quant_modules
-from pytorch_quantization.tensor_quant import QuantDescriptor
-from pytorch_quantization import calib
 
 def get_config(args):
     config = None

@@ -4,15 +4,23 @@ import dlib
 import numpy as np
 from PIL import Image, ImageOps
 import glob
+from facenet_pytorch import MTCNN, InceptionResnetV1
 
-MODEL_PATH = "shape_predictor_68_face_landmarks.dat"
-img_paths = sorted(glob.glob("/disk2/icml/STAR/images/ivslab_facial_train/*/images/*.*g"))
-pts_paths = sorted(glob.glob("/disk2/icml/STAR/images/ivslab_facial_train/*/labels/*.pts"))
+# If required, create a face detection pipeline using MTCNN:
+mtcnn = MTCNN(image_size=256, margin=0)
+
+
+mode = ""
+final_round = True
+if final_round:
+    mode=""
+else:
+    mode="ivslab_facial_test_private_qualification"
+MODEL_PATH = "./preprocess/shape_predictor_68_face_landmarks.dat"
+img_paths = sorted(glob.glob(f"./images/{mode}/*.png"))
 detector = dlib.get_frontal_face_detector()
 
-# python main.py --mode=train --device_ids=0 \
-#               --image_dir=./images/ --annot_dir=./annotations/ \
-#               --data_definition=ivslab
+
 pts = []
 
 class TransformPerspective():
@@ -88,7 +96,7 @@ def get_face_landmarks(image_path):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     # Initialize dlib's facial landmarks predictor
-    predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")  
+    predictor = dlib.shape_predictor("./preprocess/shape_predictor_68_face_landmarks.dat")  
 
     # Detect faces in the image
     faces = detector(gray)
@@ -112,14 +120,6 @@ def calculate_roll_and_yaw(landmarks):
 
 def detect_and_crop_head(input_image, landmarks,factor=1.05):
     # Get facial landmarks
-
-    pts = []
-    with open(landmarks, 'r') as f:
-        for line in f.readlines():
-            if line[0] >= '0' and line[0] <= '9':
-                x, y = float(line.split(' ')[0]), float(line.split(' ')[1])
-                pts.append([x,y])
-    landmarks = np.array( pts)
     
     if landmarks is not None:
         # Calculate the center of the face using the mean of the landmarks
@@ -151,20 +151,40 @@ def get_landmarks(landmarks_path):
     return pts
 
 def generate_metadata():
-    with open('train.tsv', 'w') as f1:
-        with open('test.tsv', 'w') as f2:
+    not_detected_faces = 0
+    prev_landmarks_68_str = ""
+    with open('./annotations/ivslab/islab_test_q.tsv', 'w') as f2:
             for (idx, img_path) in enumerate(img_paths):
                 file_name = img_path
                 # handle pre_landmarks
-                landmarks = get_landmarks(pts_paths[idx])
+                print("cur img: ", img_path, " not_detected_face_count: ", not_detected_faces)
+                landmarks = get_face_landmarks(img_path)
+                if landmarks is None:
+                    # switch to mtcnn
+                    not_detected_faces += 1
+                    img = Image.open(img_path)
+                    _, boxes = mtcnn(img)
+                    if boxes is None:
+                        continue
+                    boxes = boxes[0]
+                    landmarks = np.array([[boxes[0], boxes[1]], [boxes[2], boxes[3]]])
+                    x1, x2 = landmarks[:, 0].min(), landmarks[:, 0].max()
+                    y1, y2 = landmarks[:, 1].min(), landmarks[:, 1].max()
+                    scale = min(x2 - x1, y2 - y1) / 200 * 1.05
+                    center_w = (x2 + x1) / 2
+                    center_h = (y2 + y1) / 2
+
+                    scale, center_w, center_h = str(float(scale)), str(float(center_w)), str(float(center_h))
+                    f2.write(file_name + "\t" + prev_landmarks_68_str + "\t" + prev_landmarks_68_str + "\t" + scale + "\t" + center_w + "\t" + center_h + "\n")
+                    continue
                 landmarks_str = []
                 landmarks_68_str = ''
                 for landmark in landmarks:
                     landmarks_str.append(','.join([str(x) for x in landmark]))
                 landmarks_68_str = ','.join(landmarks_str)
+                prev_landmarks_68_str = landmarks_68_str
                 
                 # handle gt_landmarks
-                landmarks_68_str = ','.join(landmarks_str)
                 
                 # handle scale, center
                 landmarks = np.array(landmarks)
@@ -178,25 +198,7 @@ def generate_metadata():
                     center_h = (y2 + y1) / 2
 
                     scale, center_w, center_h = str(float(scale)), str(float(center_w)), str(float(center_h))
-                
-                if idx % 10 == 0:
-                    f2.write(file_name + "\t" + landmarks_68_str + "\t" + landmarks_68_str + "\t" + scale + "\t" + center_w + "\t" + center_h + "\n")
-                else:
-                    f1.write(file_name + "\t" + landmarks_68_str + "\t" + landmarks_68_str + "\t" + scale + "\t" + center_w + "\t" + center_h + "\n")
-        
-    pass 
+                f2.write(file_name + "\t" + landmarks_68_str + "\t" + landmarks_68_str + "\t" + scale + "\t" + center_w + "\t" + center_h + "\n")
 
 if __name__ == '__main__':
     generate_metadata()
-    # index = 1024
-    # input_image_path = img_paths[index]
-    # input_facial_path = pts_paths[index]
-    # image = cv2.imread(input_image_path)
-    # cv2.imwrite('input.jpg', image)
-    # output_image_path = 'output.jpg'
-    
-    # # Detect and crop the head
-    # cropped_head = detect_and_crop_head(image, input_facial_path, factor=1.05)
-
-    # # Save the cropped head image
-    # cv2.imwrite('output.jpg', cropped_head)

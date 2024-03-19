@@ -1,16 +1,18 @@
-from torchstat import stat
-from cvnets import EMA, get_model
+
+
 import argparse
-from options.utils import load_config_file
-from cvnets import arguments_model, arguments_nn_layers
 from typing import Optional
 import argparse
 import torch.nn.functional as F
 import numpy as np
 from typing import Dict, Optional, Tuple, Any
-from cvnets.models.classification.base_image_encoder import BaseImageEncoder
 from torch import Tensor, nn
 import torch
+import sys
+sys.path.insert(0, './ml-cvnets')
+from cvnets.models.classification.base_image_encoder import BaseImageEncoder 
+from options.utils import load_config_file
+from cvnets import arguments_model, arguments_nn_layers
 from cvnets.layers import ConvLayer2d, GlobalPool, Identity, LinearLayer
 from cvnets.models.classification.base_image_encoder import BaseImageEncoder
 from cvnets.models.classification.config.mobilevit_v2 import get_configuration

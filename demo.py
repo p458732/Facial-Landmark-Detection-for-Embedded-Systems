@@ -6,12 +6,11 @@ import copy
 import dlib
 import math
 import argparse
-from PIL import Image, ImageOps
+from PIL import Image
 import numpy as np
-import gradio as gr
 from matplotlib import pyplot as plt
 import torch
-from facenet_pytorch import MTCNN, InceptionResnetV1
+from facenet_pytorch import MTCNN
 # private package
 from lib import utility
 
@@ -112,6 +111,7 @@ class Alignment:
             utility.set_environment(self.config)
             self.config.init_instance()
             if self.config.logger is not None:
+                
                 self.config.logger.info("Loaded configure file %s: %s" % (args.config_name, self.config.id))
                 self.config.logger.info("\n" + "\n".join(["%s: %s" % item for item in self.config.__dict__.items()]))
 
@@ -213,7 +213,7 @@ def draw_pts(img, pts, mode="index", shift=4, color=(0, 255, 0), radius=1, thick
 
 def get_two_faces_list():
     l = []
-    with open('/disk2/icml/STAR/annotations/ivslab/test_q.txt', 'r') as f:
+    with open('./annotations/ivslab/test_q.txt', 'r') as f:
         l = f.readlines()
     return l
 def process(input_image, path=None):
@@ -282,7 +282,7 @@ if __name__ == '__main__':
     save_imgs =  False
     # face detector
     # could be downloaded in this repo: https://github.com/italojs/facial-landmarks-recognition/tree/master
-    predictor_path =  '/disk2/icml/STAR/shape_predictor_68_face_landmarks.dat'
+    predictor_path =  './preprocess/shape_predictor_68_face_landmarks.dat'
     detector = dlib.get_frontal_face_detector()
     sp = dlib.shape_predictor(predictor_path)
     avg_time = 0
@@ -292,7 +292,7 @@ if __name__ == '__main__':
     args.config_name = 'alignment'
     # could be downloaded here: https://drive.google.com/file/d/1aOx0wYEZUfBndYy_8IYszLPG_D2fhxrT/view
     #model_path = '/disk2/icml/STAR/ivslab/efficientformerv2_s0_0.0420/model/best_model.pkl'
-    model_path = '/disk2/icml/STAR/ivslab/efficientformerv2_s0_0.0342/model/best_model.pkl'
+    model_path = './ivslab/mobile_vit_0.0496/model/best_model.pkl'
     device_ids = '0'
     device_ids = list(map(int, device_ids.split(",")))
     alignment = Alignment(args, model_path, dl_framework="pytorch", device_ids=device_ids)
@@ -300,22 +300,18 @@ if __name__ == '__main__':
     # image:      input image
     # image_draw: draw the detected facial landmarks on image
     # results:    a list of detected facial landmarks
-    img_paths = sorted(glob.glob("/disk2/icml/STAR/images/ivslab_facial_test_private_qualification/*.png"))
+    img_paths = sorted(glob.glob("./images/ivslab_facial_test_private_qualification/*.png"))
     two_faces_list = get_two_faces_list()
     for face_file_path in img_paths:
         image = cv2.imread(face_file_path)
-        try:
-            image_draw, results = process(image, face_file_path)
+        image_draw, results = process(image, face_file_path)
             
-            with open (f'./test_data/{face_file_path.split("/")[-1].split(".")[0]}.txt','w') as f:
-                for result in results:
-                    f.write('version: 1\n' + 'n_points: 51\n' + '{\n')
-                    for landmark in result:
-                        f.write(f"{landmark[0]:.3f}" + ' ' + f"{landmark[1]:.3f}" + '\n')
-                    f.write('}\n')
-           
-        except:
-            continue
+        with open (f'./test_data/{face_file_path.split("/")[-1].split(".")[0]}.txt','w') as f:
+            for result in results:
+                f.write('version: 1\n' + 'n_points: 51\n' + '{\n')
+                for landmark in result:
+                    f.write(f"{landmark[0]:.3f}" + ' ' + f"{landmark[1]:.3f}" + '\n')
+                f.write('}\n')
         if save_imgs == False:
             continue
         # visualize
