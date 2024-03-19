@@ -719,13 +719,15 @@ class SwinTransformerV2(nn.Module):
             self.layers.append(layer)
 
         self.norm = norm_layer(self.num_features)
+        self.student_channel = 256
         self.avgpool = nn.AdaptiveAvgPool1d(1)
-        self.final_upsample1 = nn.Sequential(nn.ConvTranspose2d(self.num_features, self.num_features, 6, stride=4, padding=1),nn.BatchNorm2d(self.num_features), nn.ReLU())
-        self.final_upsample2 = nn.Sequential(nn.ConvTranspose2d(self.num_features, self.num_features, 4, stride=2, padding=1),nn.BatchNorm2d(self.num_features), nn.ReLU())
+        self.align_channel = nn.Conv2d(self.num_features, 256, kernel_size=1, stride=1)
+        self.final_upsample1 = nn.Sequential(nn.ConvTranspose2d(self.student_channel, self.student_channel, 6, stride=4, padding=1),nn.BatchNorm2d(self.student_channel), nn.ReLU())
+        self.final_upsample2 = nn.Sequential(nn.ConvTranspose2d(self.student_channel, self.student_channel, 4, stride=2, padding=1),nn.BatchNorm2d(self.student_channel), nn.ReLU())
         
-        self.out_pointmaps = ConvBlock(self.num_features, 51, 1, relu=False, bn=False)
-        self.out_edgemaps = ConvBlock(self.num_features, 8, 1, relu=False, bn=False)
-        self.out_heatmaps = ConvBlock(self.num_features, 51, 1, relu=False, bn=False)
+        self.out_pointmaps = ConvBlock(self.student_channel, 51, 1, relu=False, bn=False)
+        self.out_edgemaps = ConvBlock(self.student_channel, 8, 1, relu=False, bn=False)
+        self.out_heatmaps = ConvBlock(self.student_channel, 51, 1, relu=False, bn=False)
         self.pointmap_act = Activation("sigmoid", 51)
         self.edgemap_act = Activation("sigmoid", 8)
         self.heatmap_act = Activation("in+relu", 51)
@@ -767,6 +769,8 @@ class SwinTransformerV2(nn.Module):
 
         x = self.norm(x)  # B L C
         x = x.transpose(1,2).reshape((-1, 1024, 8, 8))
+        x = self.align_channel(x)
+        x = x + ((0.01**0.5)*torch.randn(x.shape)).to('cuda:0')
         x = self.final_upsample1(x)
         x = self.final_upsample2(x)
         heatmaps = self.heatmap_act(self.out_heatmaps(x))
@@ -821,6 +825,7 @@ def swin_v2():
 
     return model
 
-model = swin_v2()
-y, f, w = model(torch.zeros((16,3,256,256)))
-print(y[0].shape)
+# model = swin_v2()
+# # 256 8 8
+# y, f, w = model(torch.zeros((16,3,256,256)))
+# print(y[0].shape)
