@@ -15,6 +15,9 @@
                 "--batch_size=16"
             ],
             "console": "integratedTerminal",
+            "env": {
+                "MAX_ITEMS_TO_HANDLE": "1000",
+            },
             "justMyCode": true
         }
     ]

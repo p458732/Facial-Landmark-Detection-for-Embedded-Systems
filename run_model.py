@@ -1,6 +1,6 @@
 import glob
+import sys
 import os
-import time
 import cv2
 import copy
 import dlib
@@ -177,7 +177,7 @@ class Alignment:
                
                 output = self.alignment(input_tensor)
                 
-            landmarks = output[-2][0]
+            landmarks = output[2][0]
         else:
             assert False
 
@@ -188,29 +188,6 @@ class Alignment:
         return landmarks
 
 
-def draw_pts(img, pts, mode="index", shift=4, color=(0, 255, 0), radius=1, thickness=1, save_path=None, dif=0,
-             scale=0.3, concat=False, ):
-    img_draw = copy.deepcopy(img)
-    mode = "index"
-    for cnt, p in enumerate(pts):
-        if mode == "index":
-            cv2.putText(img_draw, str(cnt), (int(float(p[0] + dif)), int(float(p[1] + dif))), cv2.FONT_HERSHEY_SIMPLEX,
-                        scale, color, thickness)
-        elif mode == 'pts':
-            if len(img_draw.shape) > 2:
-                # 此处来回切换是因为opencv的bug
-                img_draw = cv2.cvtColor(img_draw, cv2.COLOR_BGR2RGB)
-                img_draw = cv2.cvtColor(img_draw, cv2.COLOR_RGB2BGR)
-            cv2.circle(img_draw, (int(p[0] * (1 << shift)), int(p[1] * (1 << shift))), radius << shift, color, -1,
-                       cv2.LINE_AA, shift=shift)
-        else:
-            raise NotImplementedError
-    if concat:
-        img_draw = np.concatenate((img, img_draw), axis=1)
-    if save_path is not None:
-        cv2.imwrite(save_path, img_draw)
-    return img_draw
-
 def get_two_faces_list():
     l = []
     with open('./annotations/ivslab/test_q.txt', 'r') as f:
@@ -220,14 +197,11 @@ def process(input_image, path=None):
     
     image_draw = copy.deepcopy(input_image)
     dets = detector(input_image, 1)
-    max_num_faces = 1
-    for l in two_faces_list:
-        if l[:-1] in path:
-            max_num_faces = 2
+    max_num_faces = 2
     dets = dets[:max_num_faces]
-    num_faces = len(dets)
+    
     results = []
-    imgg = Image.open(face_file_path)
+    imgg = Image.open(path)
     _, boxes = mtcnn(imgg)
     if boxes is None:
         print("Switch to dlib: ", path)
@@ -239,7 +213,6 @@ def process(input_image, path=None):
                 y = face.part(i).y
                 shape.append((x, y))
             shape = np.array(shape)
-            # image_draw = draw_pts(image_draw, shape)
             x1, x2 = shape[:, 0].min(), shape[:, 0].max()
             y1, y2 = shape[:, 1].min(), shape[:, 1].max()
             scale = min(x2 - x1, y2 - y1) / 200 * 1.05
@@ -249,8 +222,8 @@ def process(input_image, path=None):
             scale, center_w, center_h = float(scale), float(center_w), float(center_h)
             landmarks_pv = alignment.analyze(input_image, scale, center_w, center_h)
             results.append(landmarks_pv)
-            image_draw = draw_pts(image_draw, landmarks_pv)
-        return image_draw, results
+            
+        return None, results
     boxes = boxes[:max_num_faces]
     if boxes.shape[0] > 1:
         n = boxes.shape[0]
@@ -272,51 +245,45 @@ def process(input_image, path=None):
         scale, center_w, center_h = float(scale), float(center_w), float(center_h)
         landmarks_pv = alignment.analyze(input_image, scale, center_w, center_h)
         results.append(landmarks_pv)
-        if save_imgs == False:
-            continue
-        image_draw = draw_pts(image_draw, landmarks_pv)
-    return image_draw, results
+    return None, results
 
 
 if __name__ == '__main__':
-    save_imgs =  False
-    # face detector
-    # could be downloaded in this repo: https://github.com/italojs/facial-landmarks-recognition/tree/master
+    img_paths = []
+    image_list_path = sys.argv[1]
+    output_path = sys.argv[2]
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+    # load image paths
+    with open(image_list_path, 'r') as f:
+        for line in f.readlines():
+            line = line.replace('\n', '')
+            img_paths.append(line)
+   
+    # load face detector 
     predictor_path =  './preprocess/shape_predictor_68_face_landmarks.dat'
     detector = dlib.get_frontal_face_detector()
     sp = dlib.shape_predictor(predictor_path)
-    avg_time = 0
-    count = 0
+    
     # facial landmark detector
     args = argparse.Namespace()
     args.config_name = 'alignment'
-    # could be downloaded here: https://drive.google.com/file/d/1aOx0wYEZUfBndYy_8IYszLPG_D2fhxrT/view
-    #model_path = '/disk2/icml/STAR/ivslab/efficientformerv2_s0_0.0420/model/best_model.pkl'
     model_path = './ivslab/mobile_vit_0.0496/model/best_model.pkl'
-    device_ids = '0'
-    device_ids = list(map(int, device_ids.split(",")))
+    device_ids = [0] if torch.cuda.is_available() else [-1]
     alignment = Alignment(args, model_path, dl_framework="pytorch", device_ids=device_ids)
-    
-    # image:      input image
-    # image_draw: draw the detected facial landmarks on image
-    # results:    a list of detected facial landmarks
-    img_paths = sorted(glob.glob("./images/ivslab_facial_test_private_qualification/*.png"))
-    two_faces_list = get_two_faces_list()
+        
+    #two_faces_list = get_two_faces_list()
     for face_file_path in img_paths:
         image = cv2.imread(face_file_path)
         image_draw, results = process(image, face_file_path)
-            
-        with open (f'./test_data/{face_file_path.split("/")[-1].split(".")[0]}.txt','w') as f:
+        
+        with open (f'{output_path}/{face_file_path.split("/")[-1].split(".")[0]}.txt','w') as f:
             for result in results:
                 f.write('version: 1\n' + 'n_points: 51\n' + '{\n')
                 for landmark in result:
                     f.write(f"{landmark[0]:.3f}" + ' ' + f"{landmark[1]:.3f}" + '\n')
                 f.write('}\n')
-        if save_imgs == False:
-            continue
-        # visualize
-        img = cv2.cvtColor(image_draw, cv2.COLOR_BGR2RGB)
-        plt.imsave(f'./test_imgs/{face_file_path.split("/")[-1]}', img)
+       
 
     # demo
     # interface = gr.Interface(fn=process, inputs="image", outputs="image")

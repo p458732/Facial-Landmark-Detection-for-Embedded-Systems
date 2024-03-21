@@ -543,14 +543,18 @@ class MobileViTBlockv2(BaseModule):
         batch_size, in_dim, patch_size, n_patches = patches.shape
 
         # [B, C, P, N]
-        patches = patches.reshape(batch_size, in_dim * patch_size, n_patches)
+        # patches = patches.reshape(batch_size, in_dim * patch_size, n_patches)
 
-        feature_map = F.fold(
-            patches,
-            output_size=output_size,
-            kernel_size=(self.patch_h, self.patch_w),
-            stride=(self.patch_h, self.patch_w),
-        )
+        # feature_map = F.fold(
+        #     patches,
+        #     output_size=output_size,
+        #     kernel_size=(self.patch_h, self.patch_w),
+        #     stride=(self.patch_h, self.patch_w),
+        # )
+        feature_map = patches.reshape(batch_size, in_dim, int(patch_size ** 0.5), int(patch_size ** 0.5), int(n_patches ** 0.5), int(n_patches ** 0.5))
+        feature_map = feature_map.permute(0,1,2,4,3,5)
+        feature_map = feature_map.permute(0,1, 3, 2, 5,4)
+        feature_map = feature_map.reshape(batch_size, in_dim, output_size[0], output_size[1])
 
         return feature_map
 

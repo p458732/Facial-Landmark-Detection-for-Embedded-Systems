@@ -403,8 +403,8 @@ class MobileViTv2(BaseImageEncoder):
         # that do not adhere to the structure of BaseEncoder can still
         # use neural augmentor
         y, fusionmaps = [], []
-        x = self.extract_features(x)
-        x = self.final_upsample(x)
+        inter_feat = self.extract_features(x)
+        x = self.final_upsample(inter_feat)
         #x = self.final_upsample1(x)
         #x = self.final_upsample2(x)
         #x = self.upsample(x)
@@ -428,7 +428,7 @@ class MobileViTv2(BaseImageEncoder):
         y.append(edgemaps)
 
         fusionmaps.append(fusion_heatmaps)
-        return y, fusionmaps, landmarks
+        return y, fusionmaps, landmarks, inter_feat
     
     def forward(self, x: Any, *args, **kwargs) -> Any:
         """A forward function of the model, optionally training the model with

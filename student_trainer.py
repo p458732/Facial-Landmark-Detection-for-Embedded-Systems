@@ -56,10 +56,19 @@ def train_worker(world_rank, world_size, nodes_size, args):
         net_ema = None
 
     # multi-GPU training
+    # net1_dict=net.net1.state_dict()
+    # pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in net1_dict}
+    # net1_dict.update(pretrained_dict)
+    # net.net1.load_state_dict(net1_dict)
     net_module = teacher_net
     # load pretrain teacher model
     try:
         checkpoint = torch.load(config.teacher_weight_path)
+        teacher_net_partital = student_net.state_dict()
+        my_list = ['out_pointmaps.conv.weight', 'out_pointmaps.conv.bias', 'out_edgemaps.conv.weight', 'out_edgemaps.conv.bias', 'out_heatmaps.conv.weight', 'out_heatmaps.conv.bias']
+        for k in my_list:
+            teacher_net_partital.update({k:checkpoint["net"][k]})
+        student_net.load_state_dict(teacher_net_partital, strict= False)
         teacher_net.load_state_dict(checkpoint["net"], strict=False)
         if config.logger is not None:
             config.logger.warn("Successed to load pretrain model %s." % config.teacher_weight_path)

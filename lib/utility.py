@@ -125,8 +125,10 @@ def get_optimizer(config, net):
             lr=config.learn_rate)
     elif config.optimizer == "adamW":
         optimizer = optim.AdamW([
-            {'params': base_params}, 
-            {'params': params, 'lr': 1e-3, 'weight_decay': 2e-5}], lr=config.learn_rate, weight_decay=config.weight_decay)
+            {'params': base_params}], lr=config.learn_rate, weight_decay=config.weight_decay)
+        # optimizer = optim.AdamW([
+        #     {'params': base_params}, 
+        #     {'params': params, 'lr': 1e-3, 'weight_decay': 2e-5}], lr=config.learn_rate, weight_decay=config.weight_decay)
     elif config.optimizer == "rmsprop":
         optimizer = optim.RMSprop(
             params,
@@ -358,9 +360,9 @@ def forward(config, test_loader, net, student= False, val_dataloader=None):
 
         with torch.no_grad():
             if student:
-                output, heatmap, landmarks = net(input)
+                output, heatmap, landmarks, _ = net(input)
             else:
-                output, heatmap, landmarks = net(input)
+                output, heatmap, landmarks, _ = net(input)
 
             # metrics
         if student:
@@ -379,30 +381,35 @@ def forward(config, test_loader, net, student= False, val_dataloader=None):
 
     return output_pd, metrics
 
-def compute_student_loss(config, teacher_output ,teacher_heatmap, teacher_labels , student_output, student_heatmap,  student_labels, labels, criterions):
+def compute_student_loss(config, teacher_output ,teacher_heatmap, teacher_labels , student_output, student_heatmap,  student_labels, student_inter_feat, teacher_inter_feat, labels, criterions):
     batch_weight = 1.0
     sum_loss = 0
     losses = list()
     # star loss
-    for k in range(config.label_num):
-        if config.criterions[k] in ['smoothl1', 'l1', 'l2', 'WingLoss', 'AWingLoss']:
-            loss = criterions[k](student_output[k], labels[k])
-        elif config.criterions[k] in ["STARLoss", "STARLoss_v2"]:
-            _k = int(k / 3) if config.use_AAM else k
-            loss = criterions[k](student_heatmap[_k], labels[k])
-        else:
-            assert NotImplementedError
-        loss = batch_weight * loss
-        sum_loss += config.loss_weights[k] * loss
-        loss = float(loss.data.cpu().item())
-        losses.append(loss)
+    # for k in range(config.label_num):
+    #     if config.criterions[k] in ['smoothl1', 'l1', 'l2', 'WingLoss', 'AWingLoss']:
+    #         loss = criterions[k](student_output[k], labels[k])
+    #     elif config.criterions[k] in ["STARLoss", "STARLoss_v2"]:
+    #         _k = int(k / 3) if config.use_AAM else k
+    #         loss = criterions[k](student_heatmap[_k], labels[k])
+    #     else:
+    #         assert NotImplementedError
+    #     loss = batch_weight * loss
+    #     sum_loss += config.loss_weights[k] * loss
+    #     loss = float(loss.data.cpu().item())
+    #     losses.append(loss)
         
-    # KD heatmap loss
-    kd_loss = nn.MSELoss()(teacher_heatmap[-1], student_heatmap[-1])
-    sum_loss += 1000 * kd_loss
-    kd_loss = float(kd_loss.data.cpu().item())
-    losses.append(1000 * kd_loss)
+    # # KD heatmap loss
+    # kd_loss = nn.MSELoss()(teacher_heatmap[-1], student_heatmap[-1])
+    # sum_loss += 1000 * kd_loss
+    # kd_loss = float(kd_loss.data.cpu().item())
+    # losses.append(1000 * kd_loss)
     
+    # test
+    loss =  nn.MSELoss()(teacher_inter_feat, student_inter_feat)
+    sum_loss = loss
+    loss = float(loss.data.cpu().item())
+    losses.append( loss)
     # KD landmark loss
     # kd_loss_2 = nn.SmoothL1Loss()(student_output[0], teacher_output[0])
     # sum_loss += 10 * kd_loss_2
@@ -478,12 +485,12 @@ def forward_backward_student(config, train_loader, teacher_net, student_net, cri
         labels = config.nstack * labels
         # forward
         input = input.to('cuda:0')
-        student_output, student_heatmaps, student_landmarks  = student_net(input)
-        teacher_output, teacher_heatmaps, teacher_landmarks = teacher_net(input)
+        student_output, student_heatmaps, student_landmarks, student_inter_feat  = student_net(input)
+        teacher_output, teacher_heatmaps, teacher_landmarks, teacher_inter_feat = teacher_net(input)
         
         # loss
         losses, sum_loss = compute_student_loss(
-            config, teacher_output, teacher_heatmaps, teacher_landmarks, student_output, student_heatmaps, student_landmarks, labels, criterions  )
+            config, teacher_output, teacher_heatmaps, teacher_landmarks, student_output, student_heatmaps, student_landmarks, student_inter_feat, teacher_inter_feat, labels, criterions  )
         ave_losses = list(map(sum, zip(ave_losses, losses)))
 
         # backward
