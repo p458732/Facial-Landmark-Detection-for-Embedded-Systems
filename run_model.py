@@ -5,6 +5,7 @@ import cv2
 import copy
 import dlib
 import math
+import tensorflow as tf
 import argparse
 from PIL import Image
 import numpy as np
@@ -124,6 +125,27 @@ class Alignment:
             net = net.to(self.config.device_id)
             net.eval()
             self.alignment = net
+        elif self.dl_framework == "tf":
+            self.config = utility.get_config(args)
+            self.config.device_id = device_ids[0]
+            
+            model = tf.saved_model.load('./my')
+            model.trainable = False
+            self.alignment = model
+            
+        elif self.dl_framework == "tf_lite":
+            self.config = utility.get_config(args)
+            self.config.device_id = device_ids[0]
+            
+            interpreter = tf.lite.Interpreter(model_path="./my/converted_model.tflite")
+            interpreter.allocate_tensors()
+            # Get input and output tensors
+            self.input_details = interpreter.get_input_details()
+            self.output_details = interpreter.get_output_details()
+            
+            self.alignment = interpreter
+            
+            pass
         else:
             assert False
 
@@ -141,14 +163,32 @@ class Alignment:
             return (points * 2 + 1) / torch.tensor([self.input_size, self.input_size]).to(points).view(1, 1, 2) - 1
 
     def denorm_points(self, points, align_corners=False):
-        if align_corners:
-            # [-1, +1] -> [0, SIZE-1]
-            return (points + 1) / 2 * torch.tensor([self.input_size - 1, self.input_size - 1]).to(points).view(1, 1, 2)
-        else:
-            # [-1, +1] -> [-0.5, SIZE-0.5]
-            return ((points + 1) * torch.tensor([self.input_size, self.input_size]).to(points).view(1, 1, 2) - 1) / 2
+        if self.dl_framework == "pytorch":
+            if align_corners:
+                # [-1, +1] -> [0, SIZE-1]
+                landmarks = (points + 1) / 2 * torch.tensor([self.input_size - 1, self.input_size - 1]).to(points).view(1, 1, 2)
+                landmarks = landmarks.data.cpu().numpy()[0]
+                return landmarks
+            else:
+                # [-1, +1] -> [-0.5, SIZE-0.5]
+                landmarks = ((points + 1) * torch.tensor([self.input_size, self.input_size]).to(points).view(1, 1, 2) - 1) / 2
+                landmarks = landmarks.data.cpu().numpy()[0]
+                return landmarks
+            
+        elif self.dl_framework == "tf" or self.dl_framework == "tf_lite":
+            if align_corners:
+                # [-1, +1] -> [0, SIZE-1]
+                landmarks = (points + 1) / 2 * tf.constant([self.input_size - 1, self.input_size - 1], dtype=tf.float32)
+                landmarks = tf.squeeze(landmarks).numpy()
+                return landmarks
+            else:
+                # [-1, +1] -> [-0.5, SIZE-0.5]
+                landmarks = ((points + 1) * tf.constant([self.input_size, self.input_size], dtype=tf.float32) - 1) / 2
+                landmarks = tf.squeeze(landmarks).numpy()
+                return landmarks
 
-    def preprocess(self, image, scale, center_w, center_h):
+
+    def preprocess_pytorch(self, image, scale, center_w, center_h):
         matrix = self.getCropMatrix.process(scale, center_w, center_h)
         input_tensor = self.transformPerspective.process(image, matrix)
         input_tensor = input_tensor[np.newaxis, :]
@@ -158,7 +198,31 @@ class Alignment:
         input_tensor = input_tensor / 255.0 * 2.0 - 1.0
         input_tensor = input_tensor.to(self.config.device_id)
         return input_tensor, matrix
+    
+    def preprocess_tensorflow(self, image, scale, center_w, center_h):
+        matrix = self.getCropMatrix.process(scale, center_w, center_h)
+        input_tensor = self.transformPerspective.process(image, matrix)
+        input_tensor = input_tensor[np.newaxis, :]
 
+        input_tensor = tf.convert_to_tensor(input_tensor, dtype=tf.float32)
+        input_tensor = tf.transpose(input_tensor, perm=[0, 3, 1, 2])
+        input_tensor = input_tensor / 255.0 * 2.0 - 1.0
+
+        #input_tensor = input_tensor.to(self.config.device_id)
+        return input_tensor, matrix
+    
+    def preprocess_tensorflow_lite(self, image, scale, center_w, center_h):
+        matrix = self.getCropMatrix.process(scale, center_w, center_h)
+        input_tensor = self.transformPerspective.process(image, matrix)
+        input_tensor = input_tensor[np.newaxis, :]
+
+        input_tensor = tf.convert_to_tensor(input_tensor, dtype=tf.float32)
+        input_tensor = tf.transpose(input_tensor, perm=[0, 3, 1, 2])
+        input_tensor = input_tensor / 255.0 * 2.0 - 1.0
+        
+        #input_tensor = input_tensor.to(self.config.device_id)
+        return input_tensor, matrix
+    
     def postprocess(self, srcPoints, coeff):
         # dstPoints = self.transformPoints2D.process(srcPoints, coeff)
         # matrix^(-1) * src = dst
@@ -170,19 +234,28 @@ class Alignment:
         return dstPoints
 
     def analyze(self, image, scale, center_w, center_h):
-        input_tensor, matrix = self.preprocess(image, scale, center_w, center_h)
-
         if self.dl_framework == "pytorch":
+            input_tensor, matrix = self.preprocess_pytorch(image, scale, center_w, center_h)
             with torch.no_grad():
-               
                 output = self.alignment(input_tensor)
-                
             landmarks = output[2][0]
+            
+        elif self.dl_framework == "tf":
+            input_tensor, matrix = self.preprocess_tensorflow(image, scale, center_w, center_h)
+
+            out = self.alignment(**{'input1': input_tensor})
+            landmarks = out['output0']
+            pass
+        elif self.dl_framework == "tf_lite":
+            input_tensor, matrix = self.preprocess_tensorflow_lite(image, scale, center_w, center_h)
+            self.alignment.set_tensor(self.input_details[0]['index'], input_tensor)
+            self.alignment.invoke()
+            landmarks = self.alignment.get_tensor(self.output_details[1]['index'])
         else:
             assert False
 
         landmarks = self.denorm_points(landmarks)
-        landmarks = landmarks.data.cpu().numpy()[0]
+        
         landmarks = self.postprocess(landmarks, np.linalg.inv(matrix))
 
         return landmarks
@@ -250,6 +323,8 @@ def process(input_image, path=None):
 
 if __name__ == '__main__':
     img_paths = []
+    sys.argv[1] = './image_list.txt'
+    sys.argv[2] = './test_out'
     image_list_path = sys.argv[1]
     output_path = sys.argv[2]
     if not os.path.exists(output_path):
@@ -270,7 +345,7 @@ if __name__ == '__main__':
     args.config_name = 'alignment'
     model_path = './ivslab/mobile_vit_0.0496/model/best_model.pkl'
     device_ids = [0] if torch.cuda.is_available() else [-1]
-    alignment = Alignment(args, model_path, dl_framework="pytorch", device_ids=device_ids)
+    alignment = Alignment(args, model_path, dl_framework="tf_lite", device_ids=device_ids)
         
     #two_faces_list = get_two_faces_list()
     for face_file_path in img_paths:

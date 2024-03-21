@@ -3,7 +3,6 @@
 *.png
 *.pt
 *.pts
-*.onnx
 *.trt
 *.pkl
 *.zip*
@@ -18,4 +17,3 @@
 /ivslab
 /WFLW
 /onnx-tensorflow
-/my
