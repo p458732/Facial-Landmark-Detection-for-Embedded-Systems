@@ -36,7 +36,11 @@ Abstract: TBD
 |:-----------------------------------------------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | ivslab                                                             | TBD|
 
-
+## Model Quantization
+Our tflite model is at "./my/converted_model.tflite". ${output_dir} will contain the inference results of the ${image_list.txt} after running the shell below.
+```shell
+python run_model.py ${image_list.txt} ${output_dir}
+```
 
 ### Teacher Training (take ivslab as example)
 ##### Note that in this version you need to change the backbone in alignment.py.
