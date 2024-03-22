@@ -323,10 +323,11 @@ def process(input_image, path=None):
 
 if __name__ == '__main__':
     img_paths = []
-    sys.argv[1] = './image_list.txt'
-    sys.argv[2] = './test_out'
+    # sys.argv[1] = './image_list.txt'
+    # sys.argv[2] = './test_out'
     image_list_path = sys.argv[1]
     output_path = sys.argv[2]
+    
     if not os.path.exists(output_path):
         os.makedirs(output_path)
     # load image paths
