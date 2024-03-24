@@ -448,8 +448,8 @@ def mobile_vit_v2():
     return model
     
 
-# model = mobile_vit_v2()
-# x = model(torch.rand(1,3,256,256))
+model = mobile_vit_v2()
+x = model(torch.rand(1,3,256,256))
 # print(123)
 # stat(model, (3,256,256))
 # device = torch.device("cuda")

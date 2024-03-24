@@ -107,68 +107,61 @@ def dataset_gen():
 
 
 if __name__ == '__main__':
-#     # model = mobile_vit_v2()
-#     # pretrained_weight = '/disk2/icml/STAR/ivslab/mobile_vit_0.0496/model/best_model.pkl'
-#     # model.load_state_dict(torch.load(pretrained_weight)['net'], strict=False)
-#     # model.eval()
-#     input_shape = (256,256)
-#     output_path = './MyNet.onnx'
-#     # model_convert_onnx(model, input_shape, output_path)
-#     # print("model convert onnx finsh.")
-#     onnx_model = onnx.load(output_path)
-#     onnx.checker.check_model(onnx_model)
-#     print("onnx model check_1 finsh.")
-#     # x = torch.randn(size=(1, 3, input_shape[0], input_shape[1]))
-#     # with torch.no_grad():
-#     #     torch_out = model(x)
-#     # ort_session = onnxruntime.InferenceSession(output_path)
-#     # ort_inputs = {ort_session.get_inputs()[0].name: x.numpy()}
-#     # ort_outs = ort_session.run(None, ort_inputs)
-#     # ort_outs = ort_outs[0]       
-#     # np.testing.assert_allclose(torch_out[2].numpy(), ort_outs, rtol=1e-03, atol=1e-05)
-#     print("onnx model check_2 finsh.")
-#     onnx.helper.printable_graph(onnx_model.graph)   
-#     # from onnx_tf.backend import prepare
-
-#     # tf_rep = prepare(onnx_model)
-#     # tf_rep.export_graph('./my')
+    # model = mobile_vit_v2()
+    # pretrained_weight = '/disk2/icml/STAR/ivslab/mobile_vit_0.0496/model/best_model.pkl'
+    # model.load_state_dict(torch.load(pretrained_weight)['net'], strict=False)
+    # model.eval()
+    # input_shape = (256,256)
+    # output_path = './MyNet.onnx'
+    # model_convert_onnx(model, input_shape, output_path)
+    # print("model convert onnx finsh.")
+    # onnx_model = onnx.load(output_path)
+    # onnx.checker.check_model(onnx_model)
+    # print("onnx model check_1 finsh.")
+    # x = torch.randn(size=(1, 3, input_shape[0], input_shape[1]))
+    # with torch.no_grad():
+    #     torch_out = model(x)
+    # ort_session = onnxruntime.InferenceSession(output_path)
+    # ort_inputs = {ort_session.get_inputs()[0].name: x.numpy()}
+    # ort_outs = ort_session.run(None, ort_inputs)
+    # ort_outs = ort_outs[0]       
+    # np.testing.assert_allclose(torch_out[2].numpy(), ort_outs, rtol=1e-03, atol=1e-05)
+    # print("onnx model check_2 finsh.")
     
-#     import tensorflow as tf
-#     # tf.debugging.set_log_device_placement(True)
-#     # model = tf.saved_model.load('./my')
-#     # model.trainable = False
+    
+    #onnx.helper.printable_graph(onnx_model.graph)   
+    # from onnx_tf.backend import prepare
+    # output_path = './MyNet.onnx'
+    # onnx_model = onnx.load(output_path)
+    # tf_rep = prepare(onnx_model)
+    # tf_rep.export_graph('./my')
+    
+    # import tensorflow as tf
+    # tf.debugging.set_log_device_placement(True)
+    # model = tf.saved_model.load('./my')
+    # model.trainable = False
 
-#     # input_tensor = tf.random.uniform([1, 3, 256, 256])
-#     # out = model(**{'input1': input_tensor})
-#    # Print a Human readable representation of the graph
+    # input_tensor = tf.random.uniform([1, 3, 256, 256])
+    # out = model(**{'input1': input_tensor})
+   #Print a Human readable representation of the graph
 
     #===============tf -> tflite================
-    import tensorflow as tf
-    converter = tf.lite.TFLiteConverter.from_saved_model('./my')
-    converter.target_spec.supported_ops = [
-        tf.lite.OpsSet.TFLITE_BUILTINS,  # enable TFLite ops
-        tf.lite.OpsSet.SELECT_TF_OPS  # enable TF ops
-    ]
-    converter.allow_custom_ops = True
-    converter.optimizations = [tf.lite.Optimize.DEFAULT]
-
-    # enable float 16
+    # import tensorflow as tf
+    # converter = tf.lite.TFLiteConverter.from_saved_model('./my')
+    # converter.target_spec.supported_ops = [
+    #     tf.lite.OpsSet.TFLITE_BUILTINS,  # enable TFLite ops
+    #     tf.lite.OpsSet.SELECT_TF_OPS  # enable TF ops
+    # ]
+    # converter.allow_custom_ops = True
+    # # enable float 16
+    # converter.optimizations = [tf.lite.Optimize.DEFAULT]
     # converter.target_spec.supported_types = [tf.float16]
-    
-    # enable int8
-    converter.experimental_new_converter = True
-    converter.experimental_new_quantizer = True
-    converter.representative_dataset = dataset_gen
-    converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
-    # converter.inference_input_type = tf.uint8
-    # converter.inference_output_type = tf.uint8
+    # tflite_model = converter.convert()
 
-    tflite_model = converter.convert()
+    # # Save the model
+    # with open('./my/converted_model.tflite', 'wb') as f:
+    #     f.write(tflite_model)
 
-
-    #Save the model
-    with open('./my/converted_model.tflite', 'wb') as f:
-        f.write(tflite_model)
     #===============tflite inference================
     # import numpy as np
     # import tensorflow as tf

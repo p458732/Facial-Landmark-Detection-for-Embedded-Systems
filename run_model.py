@@ -5,7 +5,8 @@ import cv2
 import copy
 import dlib
 import math
-import tensorflow as tf
+from tensorflow import convert_to_tensor, float32, transpose, squeeze, constant
+import tflite_runtime.interpreter as tflite
 import argparse
 from PIL import Image
 import numpy as np
@@ -126,6 +127,7 @@ class Alignment:
             net.eval()
             self.alignment = net
         elif self.dl_framework == "tf":
+            import tensorflow as tf
             self.config = utility.get_config(args)
             self.config.device_id = device_ids[0]
             
@@ -137,7 +139,7 @@ class Alignment:
             self.config = utility.get_config(args)
             self.config.device_id = device_ids[0]
             
-            interpreter = tf.lite.Interpreter(model_path="./my/converted_model.tflite")
+            interpreter = tflite.Interpreter(model_path="./best.tflite")
             interpreter.allocate_tensors()
             # Get input and output tensors
             self.input_details = interpreter.get_input_details()
@@ -178,13 +180,13 @@ class Alignment:
         elif self.dl_framework == "tf" or self.dl_framework == "tf_lite":
             if align_corners:
                 # [-1, +1] -> [0, SIZE-1]
-                landmarks = (points + 1) / 2 * tf.constant([self.input_size - 1, self.input_size - 1], dtype=tf.float32)
-                landmarks = tf.squeeze(landmarks).numpy()
+                landmarks = (points + 1) / 2 * constant([self.input_size - 1, self.input_size - 1], dtype=float32)
+                landmarks = squeeze(landmarks).numpy()
                 return landmarks
             else:
                 # [-1, +1] -> [-0.5, SIZE-0.5]
-                landmarks = ((points + 1) * tf.constant([self.input_size, self.input_size], dtype=tf.float32) - 1) / 2
-                landmarks = tf.squeeze(landmarks).numpy()
+                landmarks = ((points + 1) * constant([self.input_size, self.input_size], dtype=float32) - 1) / 2
+                landmarks = squeeze(landmarks).numpy()
                 return landmarks
 
 
@@ -204,8 +206,8 @@ class Alignment:
         input_tensor = self.transformPerspective.process(image, matrix)
         input_tensor = input_tensor[np.newaxis, :]
 
-        input_tensor = tf.convert_to_tensor(input_tensor, dtype=tf.float32)
-        input_tensor = tf.transpose(input_tensor, perm=[0, 3, 1, 2])
+        input_tensor = convert_to_tensor(input_tensor, dtype=float32)
+        input_tensor = transpose(input_tensor, perm=[0, 3, 1, 2])
         input_tensor = input_tensor / 255.0 * 2.0 - 1.0
 
         #input_tensor = input_tensor.to(self.config.device_id)
@@ -216,8 +218,8 @@ class Alignment:
         input_tensor = self.transformPerspective.process(image, matrix)
         input_tensor = input_tensor[np.newaxis, :]
 
-        input_tensor = tf.convert_to_tensor(input_tensor, dtype=tf.float32)
-        input_tensor = tf.transpose(input_tensor, perm=[0, 3, 1, 2])
+        input_tensor = convert_to_tensor(input_tensor, dtype=float32)
+        input_tensor = transpose(input_tensor, perm=[0, 3, 1, 2])
         input_tensor = input_tensor / 255.0 * 2.0 - 1.0
         
         #input_tensor = input_tensor.to(self.config.device_id)
@@ -327,7 +329,7 @@ if __name__ == '__main__':
     # sys.argv[2] = './test_out'
     image_list_path = sys.argv[1]
     output_path = sys.argv[2]
-    
+
     if not os.path.exists(output_path):
         os.makedirs(output_path)
     # load image paths

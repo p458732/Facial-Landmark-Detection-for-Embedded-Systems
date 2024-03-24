@@ -552,8 +552,35 @@ class MobileViTBlockv2(BaseModule):
         #     stride=(self.patch_h, self.patch_w),
         # )
         feature_map = patches.reshape(batch_size, in_dim, int(patch_size ** 0.5), int(patch_size ** 0.5), int(n_patches ** 0.5), int(n_patches ** 0.5))
-        feature_map = feature_map.permute(0,1,2,4,3,5)
-        feature_map = feature_map.permute(0,1, 3, 2, 5,4)
+        #feature_map = feature_map.permute(0,1,2,4,3,5)
+        x_splits = torch.split(
+            tensor= feature_map,
+            split_size_or_sections=1,
+            dim=-1,
+        )
+        splited_transposed_tensors = []
+        for x_split in x_splits:
+            squeezed_tensor = torch.squeeze(x_split, dim=-1)
+            splited_transposed_tensors.append(
+                torch.unsqueeze(squeezed_tensor.permute(0,1,2, 4, 3), dim=5)
+            )
+        feature_map = torch.cat(splited_transposed_tensors, dim=5)
+
+        # feature_map = feature_map.permute(0,1, 3, 2, 5,4)
+        x_splits = torch.split(
+            tensor= feature_map,
+            split_size_or_sections=1,
+            dim=-1,
+        )
+        splited_transposed_tensors = []
+        for x_split in x_splits:
+            squeezed_tensor = torch.squeeze(x_split, dim=-1)
+            splited_transposed_tensors.append(
+                torch.unsqueeze(squeezed_tensor.permute(0,1,3, 2, 4), dim=4)
+            )
+        feature_map = torch.cat(splited_transposed_tensors, dim=4)
+        
+        
         feature_map = feature_map.reshape(batch_size, in_dim, output_size[0], output_size[1])
 
         return feature_map
