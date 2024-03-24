@@ -217,7 +217,8 @@ class MobileViTBlock(BaseModule):
         # [B, C, N, P] --> [B, P, N, C]
         transposed_fm = reshaped_fm.transpose(1, 3)
         # [B, P, N, C] --> [BP, N, C]
-        patches = transposed_fm.reshape(batch_size * patch_area, num_patches, -1)
+        patches = transposed_fm.reshape(
+            batch_size * patch_area, num_patches, -1)
 
         info_dict = {
             "orig_size": (orig_h, orig_w),
@@ -351,7 +352,8 @@ class MobileViTBlockv2(BaseModule):
         opts,
         in_channels: int,
         attn_unit_dim: int,
-        ffn_multiplier: Optional[Union[Sequence[Union[int, float]], int, float]] = 2.0,
+        ffn_multiplier: Optional[Union[Sequence[Union[int,
+                                                      float]], int, float]] = 2.0,
         n_attn_blocks: Optional[int] = 2,
         attn_dropout: Optional[float] = 0.0,
         dropout: Optional[float] = 0.0,
@@ -462,7 +464,8 @@ class MobileViTBlockv2(BaseModule):
 
         if isinstance(ffn_mult, Sequence) and len(ffn_mult) == 2:
             ffn_dims = (
-                np.linspace(ffn_mult[0], ffn_mult[1], n_layers, dtype=float) * d_model
+                np.linspace(ffn_mult[0], ffn_mult[1],
+                            n_layers, dtype=float) * d_model
             )
         elif isinstance(ffn_mult, Sequence) and len(ffn_mult) == 1:
             ffn_dims = [ffn_mult[0] * d_model] * n_layers
@@ -526,17 +529,39 @@ class MobileViTBlockv2(BaseModule):
     def unfolding_pytorch(self, feature_map: Tensor) -> Tuple[Tensor, Tuple[int, int]]:
 
         batch_size, in_channels, img_h, img_w = feature_map.shape
-
+        
         # [B, C, H, W] --> [B, C, P, N]
-        patches = F.unfold(
-            feature_map,
-            kernel_size=(self.patch_h, self.patch_w),
-            stride=(self.patch_h, self.patch_w),
+        # [1, 64, 32, 32]
+        
+        feature_map = feature_map.reshape(batch_size, in_channels , int(img_h // self.patch_h), int(
+            self.patch_h ) , int(img_w // self.patch_w), int(self.patch_w))
+        x_splits = torch.split(
+            tensor=feature_map,
+            split_size_or_sections=1,
+            dim=-1,
         )
-        patches = patches.reshape(
+        splited_transposed_tensors = []
+        for x_split in x_splits:
+            squeezed_tensor = torch.squeeze(x_split, dim=-1)
+            splited_transposed_tensors.append(
+                torch.unsqueeze(squeezed_tensor.permute(0, 1, 3, 2, 4), dim=3)
+            )
+        feature_map = torch.cat(splited_transposed_tensors, dim=3)
+        
+        # patches = patches.reshape(
+        #     batch_size, in_channels * self.patch_h * self.patch_w, -1
+        # )
+        
+        # [1, 256, 256]
+        patches = feature_map.reshape(
             batch_size, in_channels, self.patch_h * self.patch_w, -1
         )
-
+        
+        
+        # [1, 64, 4, 256]
+        
+        
+        
         return patches, (img_h, img_w)
 
     def folding_pytorch(self, patches: Tensor, output_size: Tuple[int, int]) -> Tensor:
@@ -551,24 +576,26 @@ class MobileViTBlockv2(BaseModule):
         #     kernel_size=(self.patch_h, self.patch_w),
         #     stride=(self.patch_h, self.patch_w),
         # )
-        feature_map = patches.reshape(batch_size, in_dim, int(patch_size ** 0.5), int(patch_size ** 0.5), int(n_patches ** 0.5), int(n_patches ** 0.5))
+        feature_map = patches.reshape(batch_size, in_dim, int(
+            patch_size ** 0.5), int(patch_size ** 0.5), int(n_patches ** 0.5), int(n_patches ** 0.5))
+        
         #feature_map = feature_map.permute(0,1,2,4,3,5)
-        x_splits = torch.split(
-            tensor= feature_map,
-            split_size_or_sections=1,
-            dim=-1,
-        )
-        splited_transposed_tensors = []
-        for x_split in x_splits:
-            squeezed_tensor = torch.squeeze(x_split, dim=-1)
-            splited_transposed_tensors.append(
-                torch.unsqueeze(squeezed_tensor.permute(0,1,2, 4, 3), dim=5)
-            )
-        feature_map = torch.cat(splited_transposed_tensors, dim=5)
+        # x_splits = torch.split(
+        #     tensor=feature_map,
+        #     split_size_or_sections=1,
+        #     dim=-1,
+        # )
+        # splited_transposed_tensors = []
+        # for x_split in x_splits:
+        #     squeezed_tensor = torch.squeeze(x_split, dim=-1)
+        #     splited_transposed_tensors.append(
+        #         torch.unsqueeze(squeezed_tensor.permute(0, 1, 2, 4, 3), dim=5)
+        #     )
+        # feature_map = torch.cat(splited_transposed_tensors, dim=5)
 
         # feature_map = feature_map.permute(0,1, 3, 2, 5,4)
         x_splits = torch.split(
-            tensor= feature_map,
+            tensor=feature_map,
             split_size_or_sections=1,
             dim=-1,
         )
@@ -576,12 +603,12 @@ class MobileViTBlockv2(BaseModule):
         for x_split in x_splits:
             squeezed_tensor = torch.squeeze(x_split, dim=-1)
             splited_transposed_tensors.append(
-                torch.unsqueeze(squeezed_tensor.permute(0,1,3, 2, 4), dim=4)
+                torch.unsqueeze(squeezed_tensor.permute(0, 1, 4, 2, 3), dim=4)
             )
         feature_map = torch.cat(splited_transposed_tensors, dim=4)
-        
-        
-        feature_map = feature_map.reshape(batch_size, in_dim, output_size[0], output_size[1])
+
+        feature_map = feature_map.reshape(
+            batch_size, in_dim, output_size[0], output_size[1])
 
         return feature_map
 
