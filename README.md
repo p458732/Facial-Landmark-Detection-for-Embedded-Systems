@@ -1,7 +1,10 @@
 # Low-power Efficient and Accurate Facial-Landmark Detection for Embedded Systems (ICME 2024 Grand Challenge)
 
-Paper Link: TBD
-Abstract: TBD
+[Paper Link](https://arxiv.org/abs/2404.06029)
+The architecture of the proposed method:
+<div align=center>
+<img src="https://github.com/p458732/Facial-Landmark-Detection-for-Embedded-Systems/blob/master/teaser.png" width="800" height="296" />
+</div>
 
 ## Dependencies
 
@@ -10,11 +13,9 @@ Abstract: TBD
 * requirements.txt
 
 ## Dataset Preparation
-
-
  For Custom dataset: TBD
- 
  For ivslab challenge: [Metadata](https://drive.google.com/drive/folders/1w1p6OKh6r4xrkZ66trOuOpdLRzA4qwm9?usp=sharing) 
+
 ```script
 # the dataset directory:
 |-- images/
