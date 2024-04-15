@@ -1,5 +1,5 @@
-from run_model import Alignment
-from facenet_pytorch import MTCNN
+from run_model import *
+from lib import utility
 import argparse
 from PIL import Image
 import dlib
@@ -36,89 +36,59 @@ def model_convert_onnx(model, input_shape, output_path):
     )
 
 
-mtcnn = MTCNN(image_size=256, thresholds=[
-              0.5, 0.5, 0.5], select_largest=True, keep_all=True, margin=0)
-predictor_path = './preprocess/shape_predictor_68_face_landmarks.dat'
-sp = dlib.shape_predictor(predictor_path)
 
 
 def dataset_gen():
-    img_paths = []
-    image_list_path = './image_list.txt'
-    # load image paths
-    with open(image_list_path, 'r') as f:
-        for line in f.readlines():
-            line = line.replace('\n', '')
-            img_paths.append(line)
-
     # facial landmark detector
     args = argparse.Namespace()
     args.config_name = 'alignment'
-    model_path = './checkpoint/best_model.pkl'
+    model_path = './ivslab/stackedHGnet_v1_0.0378/model/best_model.pkl' 
     device_ids = [0] if torch.cuda.is_available() else [-1]
-    alignment = Alignment(
-        args, model_path, dl_framework="tf_lite", device_ids=device_ids)
-    for face_file_path in img_paths:
-        input_image = cv2.imread(face_file_path)
-        image_draw = copy.deepcopy(input_image)
-        detector = dlib.get_frontal_face_detector()
-        dets = detector(input_image, 1)
-        max_num_faces = 2
-        dets = dets[:max_num_faces]
+    alignment = Alignments(args, model_path, dl_framework="pytorch", device_ids=device_ids)
+    config = alignment.config
 
-        # results = []
-        imgg = Image.open(face_file_path)
-        _, boxes = mtcnn(imgg)
-        if boxes is None:
-            print("Switch to dlib: ", face_file_path)
-            for detection in dets:
-                face = sp(input_image, detection)
-                shape = []
-                for i in range(68):
-                    x = face.part(i).x
-                    y = face.part(i).y
-                    shape.append((x, y))
-                shape = np.array(shape)
-                x1, x2 = shape[:, 0].min(), shape[:, 0].max()
-                y1, y2 = shape[:, 1].min(), shape[:, 1].max()
-                scale = min(x2 - x1, y2 - y1) / 200 * 1.05
-                center_w = (x2 + x1) / 2
-                center_h = (y2 + y1) / 2
+    metadata_path = "./annotations/ivslab/train.tsv"
+    with open(metadata_path, 'r') as f:
+        lines = f.readlines()
+    
+    cnt = 0
+    for k, line in enumerate(lines):
+        cnt += 1
+        item = line.strip().split("\t")
+        image_name, landmarks_5pts, landmarks_gt, scale, center_w, center_h = item[:6]
+        # image & keypoints alignment
+        image_name = image_name.replace('\\', '/')
+        image_name = image_name.replace('//msr-facestore/Workspace/MSRA_EP_Allergan/users/yanghuan/training_data/wflw/rawImages/', '')
+        image_name = image_name.replace('./rawImages/', '')
+        # image_path = os.path.join(config.image_dir, image_name)
+        landmarks_gt = np.array(list(map(float, landmarks_gt.split(","))), dtype=np.float32).reshape(-1, 2)
+        scale, center_w, center_h = float(scale), float(center_w), float(center_h)
+        input_image = cv2.imread(image_name)
 
-                scale, center_w, center_h = float(
-                    scale), float(center_w), float(center_h)
-            yield [alignment.preprocess_tensorflow_lite(input_image, scale, center_w, center_h)[0]]
-        else:
-            boxes = boxes[:max_num_faces]
-            if boxes.shape[0] > 1:
-                n = boxes.shape[0]
-                while n > 1:
-                    n -= 1
-                    for i in range(n):
-                        if boxes[i][2] + boxes[i][0] < boxes[i + 1][2] + boxes[i + 1][0]:
-                            tmp = copy.copy(boxes[i])
-                            boxes[i] = boxes[i + 1]
-                            boxes[i + 1] = tmp
-            for box in boxes:
-                landmarks = np.array([[box[0], box[1]], [box[2], box[3]]])
-                x1, x2 = landmarks[:, 0].min(), landmarks[:, 0].max()
-                y1, y2 = landmarks[:, 1].min(), landmarks[:, 1].max()
-                scale = min(x2 - x1, y2 - y1) / 200 * 1.05
-                center_w = (x2 + x1) / 2
-                center_h = (y2 + y1) / 2
+        yield [alignment.preprocess_tensorflow_lite(input_image, scale, center_w, center_h)[0]]
 
-                scale, center_w, center_h = float(
-                    scale), float(center_w), float(center_h)
-                # landmarks_pv = alignment.analyze(input_image, scale, center_w, center_h)
-                # results.append(landmarks_pv)
-            yield [alignment.preprocess_tensorflow_lite(input_image, scale, center_w, center_h)[0]]
-
+edge_info = (
+                (True, (0, 1, 2, 3, 4)),  # RightEyebrow
+                (True, (5, 6, 7, 8, 9)),  # LeftEyebrow
+                (False, (10, 11, 12, 13)),  # NoseLine
+                (False, (14, 15, 16, 17, 18)),  # Nose
+                (True, (19, 20, 21, 22, 23, 24)),  # RightEye
+                (True, (25, 26, 27, 28, 29, 30)),  # LeftEye
+                (True, (31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42)),  # OuterLip
+                (True, (43, 44, 45, 46, 47, 48, 49, 50)),  # InnerLip
+            )
 
 if __name__ == '__main__':
-    
-    from onnxsim import simplify
+    import argparse
+    parser = argparse.ArgumentParser(description="Entry Function")
+    group = parser.add_argument_group('train')
+    group.add_argument("--train_num_workers", type=int, default=None, help="the num of workers in train process")
+    #args = parser.parse_args()
+    a = "s"
+    config = utility.get_config(a)
     model = mobile_vit_v2()
-    pretrained_weight = '/disk2/icml/STAR/ivslab/mobile_vit_0.0496/model/best_model.pkl'
+    pretrained_weight = './checkpoint/best_model.pkl'
+    from onnxsim import simplify
     model.load_state_dict(torch.load(pretrained_weight)['net'], strict=False)
     model.eval()
     input_shape = (256, 256)
@@ -163,12 +133,14 @@ if __name__ == '__main__':
     converter = tf.lite.TFLiteConverter.from_saved_model('./my')
     tflite_model = converter.convert()
 
-    # Save the model
-    with open('./org.tflite', 'wb') as f:
-        f.write(tflite_model)
-    # enable float 16
+    # enable dynamic range
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
+    converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]
     converter.target_spec.supported_types = [tf.float16]
+    # converter.experimental_new_converter = True
+    # converter.experimental_new_quantizer = True
+    # converter.representative_dataset = dataset_gen
+    # converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
     tflite_model = converter.convert()
 
     # Save the model

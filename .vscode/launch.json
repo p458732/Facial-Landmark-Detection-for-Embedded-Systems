@@ -6,6 +6,8 @@
             "request": "launch",
             "program": "${file}",
             "args": [
+                "./image_list.txt",
+                "./test_out",
                 "--mode=train_student",
                 "--device_ids=0",
                 "--image_dir=images/",

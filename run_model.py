@@ -12,12 +12,38 @@ from PIL import Image
 import numpy as np
 from matplotlib import pyplot as plt
 import torch
-from facenet_pytorch import MTCNN
 # private package
 from lib import utility
+import imutils
+from imutils.face_utils import rect_to_bb
 
 
-mtcnn = MTCNN(image_size=256, thresholds=[0.5,0.5,0.5],select_largest=True, keep_all=True, margin=0)
+cnt = 0
+
+# mtcnn = MTCNN(image_size=256, thresholds=[0.5,0.5,0.5],select_largest=True, keep_all=True, margin=0)
+
+detector = dlib.get_frontal_face_detector()
+
+
+def detect(img):
+    rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    # 偵測人臉，將辨識結果轉為(x, y, w, h)的bounding box
+    results = detector(rgb, 1)
+    rects = [rect_to_bb(rect) for rect in results]
+    return rects
+
+
+def bb_to_rect(x, y, w, h):
+    # take a bounding box predicted by face detector and convert it
+    # to the format (left, top, right, bottom) as we would normally do
+    # with dlib
+    left = x
+    top = y
+    right = w + x
+    bottom = h + y
+
+    return (left, top, right, bottom)
+
 
 class GetCropMatrix():
     """
@@ -91,7 +117,8 @@ class TransformPoints2D():
 
     def process(self, srcPoints, matrix):
         # nx3
-        desPoints = np.concatenate([srcPoints, np.ones_like(srcPoints[:, [0]])], axis=1)
+        desPoints = np.concatenate(
+            [srcPoints, np.ones_like(srcPoints[:, [0]])], axis=1)
         desPoints = desPoints @ np.transpose(matrix)  # nx3
         desPoints = desPoints[:, :2] / desPoints[:, [2, 2]]
         return desPoints.astype(srcPoints.dtype)
@@ -113,9 +140,11 @@ class Alignment:
             utility.set_environment(self.config)
             self.config.init_instance()
             if self.config.logger is not None:
-                
-                self.config.logger.info("Loaded configure file %s: %s" % (args.config_name, self.config.id))
-                self.config.logger.info("\n" + "\n".join(["%s: %s" % item for item in self.config.__dict__.items()]))
+
+                self.config.logger.info("Loaded configure file %s: %s" % (
+                    args.config_name, self.config.id))
+                self.config.logger.info(
+                    "\n" + "\n".join(["%s: %s" % item for item in self.config.__dict__.items()]))
 
             net = utility.get_net(self.config)
             if device_ids == [-1]:
@@ -130,30 +159,31 @@ class Alignment:
             import tensorflow as tf
             self.config = utility.get_config(args)
             self.config.device_id = device_ids[0]
-            
+
             model = tf.saved_model.load('./my')
             model.trainable = False
             self.alignment = model
-            
+
         elif self.dl_framework == "tf_lite":
             self.config = utility.get_config(args)
             self.config.device_id = device_ids[0]
-            
+
             interpreter = tflite.Interpreter(model_path="./best.tflite")
             interpreter.allocate_tensors()
             # Get input and output tensors
             self.input_details = interpreter.get_input_details()
             self.output_details = interpreter.get_output_details()
-            
+
             self.alignment = interpreter
-            
+
             pass
         else:
             assert False
 
         self.getCropMatrix = GetCropMatrix(image_size=self.input_size, target_face_scale=self.target_face_scale,
                                            align_corners=True)
-        self.transformPerspective = TransformPerspective(image_size=self.input_size)
+        self.transformPerspective = TransformPerspective(
+            image_size=self.input_size)
         self.transformPoints2D = TransformPoints2D()
 
     def norm_points(self, points, align_corners=False):
@@ -168,27 +198,30 @@ class Alignment:
         if self.dl_framework == "pytorch":
             if align_corners:
                 # [-1, +1] -> [0, SIZE-1]
-                landmarks = (points + 1) / 2 * torch.tensor([self.input_size - 1, self.input_size - 1]).to(points).view(1, 1, 2)
+                landmarks = (points + 1) / 2 * torch.tensor(
+                    [self.input_size - 1, self.input_size - 1]).to(points).view(1, 1, 2)
                 landmarks = landmarks.data.cpu().numpy()[0]
                 return landmarks
             else:
                 # [-1, +1] -> [-0.5, SIZE-0.5]
-                landmarks = ((points + 1) * torch.tensor([self.input_size, self.input_size]).to(points).view(1, 1, 2) - 1) / 2
+                landmarks = ((points + 1) * torch.tensor(
+                    [self.input_size, self.input_size]).to(points).view(1, 1, 2) - 1) / 2
                 landmarks = landmarks.data.cpu().numpy()[0]
                 return landmarks
-            
+
         elif self.dl_framework == "tf" or self.dl_framework == "tf_lite":
             if align_corners:
                 # [-1, +1] -> [0, SIZE-1]
-                landmarks = (points + 1) / 2 * constant([self.input_size - 1, self.input_size - 1], dtype=float32)
+                landmarks = (
+                    points + 1) / 2 * constant([self.input_size - 1, self.input_size - 1], dtype=float32)
                 landmarks = squeeze(landmarks).numpy()
                 return landmarks
             else:
                 # [-1, +1] -> [-0.5, SIZE-0.5]
-                landmarks = ((points + 1) * constant([self.input_size, self.input_size], dtype=float32) - 1) / 2
+                landmarks = (
+                    (points + 1) * constant([self.input_size, self.input_size], dtype=float32) - 1) / 2
                 landmarks = squeeze(landmarks).numpy()
                 return landmarks
-
 
     def preprocess_pytorch(self, image, scale, center_w, center_h):
         matrix = self.getCropMatrix.process(scale, center_w, center_h)
@@ -200,7 +233,7 @@ class Alignment:
         input_tensor = input_tensor / 255.0 * 2.0 - 1.0
         input_tensor = input_tensor.to(self.config.device_id)
         return input_tensor, matrix
-    
+
     def preprocess_tensorflow(self, image, scale, center_w, center_h):
         matrix = self.getCropMatrix.process(scale, center_w, center_h)
         input_tensor = self.transformPerspective.process(image, matrix)
@@ -212,7 +245,7 @@ class Alignment:
 
         #input_tensor = input_tensor.to(self.config.device_id)
         return input_tensor, matrix
-    
+
     def preprocess_tensorflow_lite(self, image, scale, center_w, center_h):
         matrix = self.getCropMatrix.process(scale, center_w, center_h)
         input_tensor = self.transformPerspective.process(image, matrix)
@@ -221,43 +254,50 @@ class Alignment:
         input_tensor = convert_to_tensor(input_tensor, dtype=float32)
         input_tensor = transpose(input_tensor, perm=[0, 3, 1, 2])
         input_tensor = input_tensor / 255.0 * 2.0 - 1.0
-        
+
         #input_tensor = input_tensor.to(self.config.device_id)
         return input_tensor, matrix
-    
+
     def postprocess(self, srcPoints, coeff):
         # dstPoints = self.transformPoints2D.process(srcPoints, coeff)
         # matrix^(-1) * src = dst
         # src = matrix * dst
         dstPoints = np.zeros(srcPoints.shape, dtype=np.float32)
         for i in range(srcPoints.shape[0]):
-            dstPoints[i][0] = coeff[0][0] * srcPoints[i][0] + coeff[0][1] * srcPoints[i][1] + coeff[0][2]
-            dstPoints[i][1] = coeff[1][0] * srcPoints[i][0] + coeff[1][1] * srcPoints[i][1] + coeff[1][2]
+            dstPoints[i][0] = coeff[0][0] * srcPoints[i][0] + \
+                coeff[0][1] * srcPoints[i][1] + coeff[0][2]
+            dstPoints[i][1] = coeff[1][0] * srcPoints[i][0] + \
+                coeff[1][1] * srcPoints[i][1] + coeff[1][2]
         return dstPoints
 
     def analyze(self, image, scale, center_w, center_h):
         if self.dl_framework == "pytorch":
-            input_tensor, matrix = self.preprocess_pytorch(image, scale, center_w, center_h)
+            input_tensor, matrix = self.preprocess_pytorch(
+                image, scale, center_w, center_h)
             with torch.no_grad():
                 output = self.alignment(input_tensor)
             landmarks = output[2][0]
-            
+
         elif self.dl_framework == "tf":
-            input_tensor, matrix = self.preprocess_tensorflow(image, scale, center_w, center_h)
+            input_tensor, matrix = self.preprocess_tensorflow(
+                image, scale, center_w, center_h)
 
             out = self.alignment(**{'input1': input_tensor})
             landmarks = out['output0']
             pass
         elif self.dl_framework == "tf_lite":
-            input_tensor, matrix = self.preprocess_tensorflow_lite(image, scale, center_w, center_h)
-            self.alignment.set_tensor(self.input_details[0]['index'], input_tensor)
+            input_tensor, matrix = self.preprocess_tensorflow_lite(
+                image, scale, center_w, center_h)
+            self.alignment.set_tensor(
+                self.input_details[0]['index'], input_tensor)
             self.alignment.invoke()
-            landmarks = self.alignment.get_tensor(self.output_details[1]['index'])
+            landmarks = self.alignment.get_tensor(
+                self.output_details[1]['index'])
         else:
             assert False
 
         landmarks = self.denorm_points(landmarks)
-        
+
         landmarks = self.postprocess(landmarks, np.linalg.inv(matrix))
 
         return landmarks
@@ -268,58 +308,66 @@ def get_two_faces_list():
     with open('./annotations/ivslab/test_q.txt', 'r') as f:
         l = f.readlines()
     return l
-def process(input_image, path=None):
-    
-    image_draw = copy.deepcopy(input_image)
-    dets = detector(input_image, 1)
-    max_num_faces = 2
-    dets = dets[:max_num_faces]
-    
-    results = []
-    imgg = Image.open(path)
-    _, boxes = mtcnn(imgg)
-    if boxes is None:
-        print("Switch to dlib: ", path)
-        for detection in dets:
-            face = sp(input_image, detection)
-            shape = []
-            for i in range(68):
-                x = face.part(i).x
-                y = face.part(i).y
-                shape.append((x, y))
-            shape = np.array(shape)
-            x1, x2 = shape[:, 0].min(), shape[:, 0].max()
-            y1, y2 = shape[:, 1].min(), shape[:, 1].max()
-            scale = min(x2 - x1, y2 - y1) / 200 * 1.05
-            center_w = (x2 + x1) / 2
-            center_h = (y2 + y1) / 2
 
-            scale, center_w, center_h = float(scale), float(center_w), float(center_h)
-            landmarks_pv = alignment.analyze(input_image, scale, center_w, center_h)
-            results.append(landmarks_pv)
-            
-        return None, results
-    boxes = boxes[:max_num_faces]
-    if boxes.shape[0] > 1:
-        n = boxes.shape[0]
+
+def process(input_image, path=None):
+    results = []
+    img = imutils.resize(input_image, width=600)
+
+    # 取得frame的大小(高，寬)
+    ratio = input_image.shape[1] / img.shape[1]
+    rects = detect(img)  # x1, y1, x2, y2
+
+    for i, rect in enumerate(rects):
+        (x, y, w, h) = tuple([ratio * x for x in rect])
+        l, t, r, b = bb_to_rect(x, y, w, h)
+        rects[i] = dlib.rectangle(
+            left=int(l), top=int(t), right=int(r), bottom=int(b))
+
+    # if boxes is None:
+    # print("Switch to dlib: ", path)
+    if rects == []:
+        #print('path: ', path)
+        #global cnt
+        #cnt+=1
+        #print(cnt)
+        rects.append(dlib.rectangle(
+            left=int(0), top=int(0), right=int(600), bottom=int(600)))
+    rects = np.array(rects)
+    if rects.shape[0] > 1:
+        n = rects.shape[0]
         while n > 1:
-            n-=1
-            for i in range(n):        
-                if boxes[i][2] + boxes[i][0] < boxes[i + 1][2] + boxes[i + 1][0] :  
-                    tmp = copy.copy(boxes[i])
-                    boxes[i] = boxes[i + 1]
-                    boxes[i + 1] = tmp
-    for box  in boxes:
-        landmarks = np.array([[box[0], box[1]], [box[2], box[3]]])
-        x1, x2 = landmarks[:, 0].min(), landmarks[:, 0].max()
-        y1, y2 = landmarks[:, 1].min(), landmarks[:, 1].max()
+            n -= 1
+            for i in range(n):
+                if rects[i].left() + rects[i].right() < rects[i + 1].left() + rects[i + 1].right():
+                    tmp = copy.copy(rects[i])
+                    rects[i] = rects[i + 1]
+                    rects[i + 1] = tmp
+
+    for detection in rects:
+        face = sp(input_image, detection)
+        shape = []
+        for i in range(68):
+            x = face.part(i).x
+            y = face.part(i).y
+            shape.append((x, y))
+        shape = np.array(shape)
+        
+        x1, x2 = shape[:, 0].min(), shape[:, 0].max()
+        y1, y2 = shape[:, 1].min(), shape[:, 1].max()
+        #img2 = cv2.rectangle(input_image, (x1, y1),(x2, y2),(255,0,0),2)
+        #cv2.imwrite(f'./test_out/{path.split("/")[-1]}.jpg', img2)
         scale = min(x2 - x1, y2 - y1) / 200 * 1.05
         center_w = (x2 + x1) / 2
         center_h = (y2 + y1) / 2
-        
-        scale, center_w, center_h = float(scale), float(center_w), float(center_h)
-        landmarks_pv = alignment.analyze(input_image, scale, center_w, center_h)
+
+        scale, center_w, center_h = float(
+            scale), float(center_w), float(center_h)
+        landmarks_pv = alignment.analyze(
+            input_image, scale, center_w, center_h)
+
         results.append(landmarks_pv)
+    
     return None, results
 
 
@@ -329,6 +377,7 @@ if __name__ == '__main__':
     # sys.argv[2] = './test_out'
     image_list_path = sys.argv[1]
     output_path = sys.argv[2]
+    cnt = 0
 
     if not os.path.exists(output_path):
         os.makedirs(output_path)
@@ -337,31 +386,30 @@ if __name__ == '__main__':
         for line in f.readlines():
             line = line.replace('\n', '')
             img_paths.append(line)
-   
-    # load face detector 
-    predictor_path =  './preprocess/shape_predictor_68_face_landmarks.dat'
-    detector = dlib.get_frontal_face_detector()
-    sp = dlib.shape_predictor(predictor_path)
-    
+
+    # load face detector
+    detector, sp = utility.get_face_detector()
+
     # facial landmark detector
     args = argparse.Namespace()
     args.config_name = 'alignment'
     model_path = './ivslab/mobile_vit_0.0496/model/best_model.pkl'
     device_ids = [0] if torch.cuda.is_available() else [-1]
-    alignment = Alignment(args, model_path, dl_framework="tf_lite", device_ids=device_ids)
-        
+    alignment = Alignment(
+        args, model_path, dl_framework="tf_lite", device_ids=device_ids)
+
     #two_faces_list = get_two_faces_list()
     for face_file_path in img_paths:
         image = cv2.imread(face_file_path)
         image_draw, results = process(image, face_file_path)
-        
-        with open (f'{output_path}/{face_file_path.split("/")[-1].split(".")[0]}.txt','w') as f:
+
+        with open(f'{output_path}/{face_file_path.split("/")[-1].split(".")[0]}.txt', 'w') as f:
             for result in results:
                 f.write('version: 1\n' + 'n_points: 51\n' + '{\n')
                 for landmark in result:
-                    f.write(f"{landmark[0]:.3f}" + ' ' + f"{landmark[1]:.3f}" + '\n')
+                    f.write(f"{landmark[0]:.3f}" + ' ' +
+                            f"{landmark[1]:.3f}" + '\n')
                 f.write('}\n')
-       
 
     # demo
     # interface = gr.Interface(fn=process, inputs="image", outputs="image")

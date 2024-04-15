@@ -113,17 +113,6 @@ class Hourglass(nn.Module):
         nf = f + increase
 
         Block = ResBlock
-
-        if add_coord:
-            self.coordconv = CoordConvTh(x_dim=x_dim, y_dim=y_dim,
-                                         with_r=True, with_boundary=True,
-                                         relu=False, bn=False,
-                                         in_channels=f, out_channels=f,
-                                         first_one=first_one,
-                                         kernel_size=1,
-                                         stride=1, padding=0)
-        else:
-            self.coordconv = None
         self.up1 = Block(f, f)
 
         # Lower branch
@@ -132,16 +121,11 @@ class Hourglass(nn.Module):
         self.low1 = Block(f, nf)
         self.n = n
         # Recursive hourglass
-        if self.n > 1:
-            self.low2 = Hourglass(n=n - 1, f=nf, increase=increase, up_mode=up_mode, add_coord=False)
-        else:
-            self.low2 = Block(nf, nf)
+        self.low2 = Block(nf, nf)
         self.low3 = Block(nf, f)
         self.up2 = nn.Upsample(scale_factor=2, mode=up_mode)
 
     def forward(self, x, heatmap=None):
-        if self.coordconv is not None:
-            x = self.coordconv(x, heatmap)
         up1 = self.up1(x)
         pool1 = self.pool1(x)
         low1 = self.low1(pool1)
@@ -189,7 +173,7 @@ class StackedHGNetV1(nn.Module):
         self.coder_type = decoder_type
         self.decoder = get_decoder(decoder_type=decoder_type)
         self.nstack = nstack
-        self.add_coord = add_coord
+        self.add_coord = True
 
         self.num_heats = classes_num[0]
 
@@ -215,10 +199,8 @@ class StackedHGNetV1(nn.Module):
             Block(128, in_channel)
         )
 
-        self.hgs = nn.ModuleList(
-            [Hourglass(n=nlevels, f=in_channel, increase=increase, add_coord=self.add_coord, first_one=(_ == 0),
+        self.hgs = Hourglass(n=nlevels, f=in_channel, increase=increase, add_coord=self.add_coord, first_one=False,
                        x_dim=int(self.cfg.width / self.nstack), y_dim=int(self.cfg.height / self.nstack))
-             for _ in range(nstack)])
 
         self.features = nn.ModuleList([
             nn.Sequential(
@@ -272,38 +254,32 @@ class StackedHGNetV1(nn.Module):
 
         y, fusionmaps = [], []
         heatmaps = None
-        for i in range(self.nstack):
-            hg = self.hgs[i](x, heatmap=heatmaps)
-            feature = self.features[i](hg)
-            #feature : 16 256 64 64
-            heatmaps0 = self.out_heatmaps[i](feature)
-            # heatmaps0: 16 51 64 64
-            heatmaps = self.heatmap_act(heatmaps0)
+        hg = self.hgs(x, heatmap=heatmaps)
+        feature = self.features[0](hg)
+        #feature : 16 256 64 64
+        heatmaps0 = self.out_heatmaps[0](feature)
+        # heatmaps0: 16 51 64 64
+        heatmaps = self.heatmap_act(heatmaps0)
 
-            if self.cfg.use_AAM:
-                pointmaps0 = self.out_pointmaps[i](feature)
-                pointmaps = self.pointmap_act(pointmaps0)
-                edgemaps0 = self.out_edgemaps[i](feature)
-                edgemaps = self.edgemap_act(edgemaps0)
-                mask = self.e2h_transform(edgemaps) * pointmaps
-                fusion_heatmaps = mask * heatmaps
-            else:
-                fusion_heatmaps = heatmaps
+        if self.cfg.use_AAM:
+            pointmaps0 = self.out_pointmaps[0](feature)
+            pointmaps = self.pointmap_act(pointmaps0)
+            edgemaps0 = self.out_edgemaps[0](feature)
+            edgemaps = self.edgemap_act(edgemaps0)
+            mask = self.e2h_transform(edgemaps) * pointmaps
+            fusion_heatmaps = mask * heatmaps
+        else:
+            fusion_heatmaps = heatmaps
 
-            landmarks = self.decoder.get_coords_from_heatmap(fusion_heatmaps)
+        landmarks = self.decoder.get_coords_from_heatmap(fusion_heatmaps)
 
-            if i < self.nstack - 1:
-                x = x + self.merge_features[i](feature) + \
-                    self.merge_heatmaps[i](heatmaps)
-                if self.cfg.use_AAM:
-                    x += self.merge_pointmaps[i](pointmaps)
-                    x += self.merge_edgemaps[i](edgemaps)
 
-            y.append(landmarks)
-            if self.cfg.use_AAM:
-                y.append(pointmaps)
-                y.append(edgemaps)
+        y.append(landmarks)
+        if self.cfg.use_AAM:
+            y.append(pointmaps)
+            y.append(edgemaps)
 
-            fusionmaps.append(fusion_heatmaps)
+        fusionmaps.append(fusion_heatmaps)
+            
 
-        return y, fusionmaps, landmarks
+        return y, fusionmaps, landmarks, fusion_heatmaps

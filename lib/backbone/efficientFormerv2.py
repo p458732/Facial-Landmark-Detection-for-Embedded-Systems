@@ -214,7 +214,7 @@ class Attention4D(torch.nn.Module):
             self.resolution = math.ceil(resolution / stride)
             self.stride_conv = nn.Sequential(nn.Conv2d(dim, dim, kernel_size=3, stride=stride, padding=1, groups=dim),
                                              nn.BatchNorm2d(dim), )
-            self.upsample = nn.Upsample(scale_factor=stride, mode='bilinear')
+            self.upsample = nn.Upsample(scale_factor=stride, mode='bilinear', align_corners=True)
         else:
             self.resolution = resolution
             self.stride_conv = None
@@ -813,7 +813,7 @@ class EfficientFormerV2(nn.Module):
         # else:
         #     cls_out = self.head(x.flatten(2).mean(-1))
         # for image classification
-        return y, fusionmaps, landmarks
+        return y, fusionmaps, landmarks, heatmaps
 
 
 def _cfg(url='', **kwargs):

@@ -10,12 +10,11 @@ from PIL import Image
 import numpy as np
 from matplotlib import pyplot as plt
 import torch
-from facenet_pytorch import MTCNN
 # private package
 from lib import utility
 
 
-mtcnn = MTCNN(image_size=256, thresholds=[0.5,0.5,0.5],select_largest=True, keep_all=True, margin=0)
+
 
 class GetCropMatrix():
     """
@@ -188,10 +187,10 @@ class Alignment:
         return landmarks
 
 
-def draw_pts(img, pts, mode="index", shift=4, color=(0, 255, 0), radius=1, thickness=1, save_path=None, dif=0,
+def draw_pts(img, pts, mode="pts", shift=4, color=(0, 255, 0), radius=2, thickness=1, save_path=None, dif=0,
              scale=0.3, concat=False, ):
     img_draw = copy.deepcopy(img)
-    mode = "index"
+    
     for cnt, p in enumerate(pts):
         if mode == "index":
             cv2.putText(img_draw, str(cnt), (int(float(p[0] + dif)), int(float(p[1] + dif))), cv2.FONT_HERSHEY_SIMPLEX,
@@ -228,7 +227,7 @@ def process(input_image, path=None):
     num_faces = len(dets)
     results = []
     imgg = Image.open(face_file_path)
-    _, boxes = mtcnn(imgg)
+    boxes = None
     if boxes is None:
         print("Switch to dlib: ", path)
         for detection in dets:
@@ -292,7 +291,7 @@ if __name__ == '__main__':
     args.config_name = 'alignment'
     # could be downloaded here: https://drive.google.com/file/d/1aOx0wYEZUfBndYy_8IYszLPG_D2fhxrT/view
     #model_path = '/disk2/icml/STAR/ivslab/efficientformerv2_s0_0.0420/model/best_model.pkl'
-    model_path = './ivslab/mobile_vit_0.0496/model/best_model.pkl'
+    model_path = './checkpoints/best_model.pkl'
     device_ids = '0'
     device_ids = list(map(int, device_ids.split(",")))
     alignment = Alignment(args, model_path, dl_framework="pytorch", device_ids=device_ids)
@@ -306,14 +305,13 @@ if __name__ == '__main__':
         image = cv2.imread(face_file_path)
         image_draw, results = process(image, face_file_path)
             
-        with open (f'./test_data/{face_file_path.split("/")[-1].split(".")[0]}.txt','w') as f:
+        with open (f'./test_out/{face_file_path.split("/")[-1].split(".")[0]}.txt','w') as f:
             for result in results:
                 f.write('version: 1\n' + 'n_points: 51\n' + '{\n')
                 for landmark in result:
                     f.write(f"{landmark[0]:.3f}" + ' ' + f"{landmark[1]:.3f}" + '\n')
                 f.write('}\n')
-        if save_imgs == False:
-            continue
+        
         # visualize
         img = cv2.cvtColor(image_draw, cv2.COLOR_BGR2RGB)
         plt.imsave(f'./test_imgs/{face_file_path.split("/")[-1]}', img)
