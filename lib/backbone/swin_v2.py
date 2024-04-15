@@ -769,8 +769,9 @@ class SwinTransformerV2(nn.Module):
 
         x = self.norm(x)  # B L C
         x = x.transpose(1,2).reshape((-1, 1024, 8, 8))
-        x = self.align_channel(x)
-        x = x + ((0.01**0.5)*torch.randn(x.shape)).to('cuda:0')
+        inter_feature = self.align_channel(x)
+        
+        x = inter_feature + ((0.01**0.5)*torch.randn(inter_feature.shape)).to('cuda:0')
         x = self.final_upsample1(x)
         x = self.final_upsample2(x)
         heatmaps = self.heatmap_act(self.out_heatmaps(x))
@@ -790,7 +791,7 @@ class SwinTransformerV2(nn.Module):
         y.append(edgemaps)
 
         fusionmaps.append(fusion_heatmaps)
-        return y, fusionmaps, landmarks
+        return y, fusionmaps, landmarks, inter_feature
         return x
 
     def forward(self, x):

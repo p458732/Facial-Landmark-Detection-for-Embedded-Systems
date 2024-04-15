@@ -3,7 +3,6 @@
 *.png
 *.pt
 *.pts
-*.onnx
 *.trt
 *.pkl
 *.zip*
@@ -17,3 +16,8 @@
 /test_imgs1
 /ivslab
 /WFLW
+/onnx-tensorflow
+test_out*
+__pycache__/
+*.pyc
+my_int8_I/O

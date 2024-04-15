@@ -1,7 +1,10 @@
 # Low-power Efficient and Accurate Facial-Landmark Detection for Embedded Systems (ICME 2024 Grand Challenge)
 
-Paper Link: TBD
-Abstract: TBD
+[Paper Link](https://arxiv.org/abs/2404.06029)
+The architecture of the proposed method:
+<div align=center>
+<img src="https://github.com/p458732/Facial-Landmark-Detection-for-Embedded-Systems/blob/master/teaser.png" width="800" height="296" />
+</div>
 
 ## Dependencies
 
@@ -10,9 +13,9 @@ Abstract: TBD
 * requirements.txt
 
 ## Dataset Preparation
-
  For Custom dataset: TBD
  For ivslab challenge: [Metadata](https://drive.google.com/drive/folders/1w1p6OKh6r4xrkZ66trOuOpdLRzA4qwm9?usp=sharing) 
+
 ```script
 # the dataset directory:
 |-- images/
@@ -27,14 +30,16 @@ Abstract: TBD
       | -- test_q.tsv
       | -- test_q.txt (annotation about the number of faces in per image)
 ```
+For generating metadata, run the following code after setting the image path. 
+```shell
+cd ./preprocess
+python  convert_training_dataset.py 
+```
 
 ## Usage
 * Work directory: set the ${ckpt_dir} in ./conf/alignment.py.
-* Pretrained model: 
+* Pretrained model (Pytorch): ./checkpoints/best_model.pkl
 
-| Dataset                                                          | Model                                                                                                                                                               |
-|:-----------------------------------------------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| ivslab                                                             | TBD|
 
 
 
@@ -67,7 +72,24 @@ python demo.py
 ```
 
 
+## Model Quantization
+Our tflite model is at "./best.tflite". 
 
+You can put your best Pytorch checkpoint in ./checkpoints/best_model.pkl and run the following code to convert to tflite model.
+
+```shell
+python test_quant.py 
+```
+
+For testing on D9300, please Turn OFF NNAPI and run the following code.
+
+output_dir will contain the inference results of the image_list.txt after running the shell below.
+```shell
+python run_model.py ${image_list.txt} ${output_dir}
+```
 
 ## Acknowledgments
-TBD
+We sincerely thank the repository listed below. This work could not have been accomplished without their contribution. 
+
+[STAR](https://github.com/ZhenglinZhou/STAR)  [SwinTransformer](https://github.com/ChristophReich1996/Swin-Transformer-V2) 
+[MobileViT](https://github.com/apple/ml-cvnets/blob/main/docs/source/en/models/classification/README-mobilevit-v2.md)

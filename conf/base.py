@@ -89,6 +89,8 @@ class Base:
             self.writer.close()
 
     def init_from_args(self, args: Namespace):
+        if args == "s": 
+            return
         args_vars = vars(args)
         for key, value in args_vars.items():
             if hasattr(self, key) and value is not None:
